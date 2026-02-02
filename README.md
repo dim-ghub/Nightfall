@@ -1,6 +1,27 @@
 # Nightfall
 3rd party plugin and theme manager for Dusky
 
+## Installation
+
+### Quick Install (Recommended)
+
+Run the installer directly without downloading:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/dim-ghub/Nightfall/main/install.sh | bash
+```
+
+### Manual Install
+
+Clone the repository and run the installer:
+
+```bash
+git clone https://github.com/dim-ghub/Nightfall ~/Nightfall
+cd ~/Nightfall
+chmod +x install.sh
+./install.sh
+```
+
 ## Usage
 
 Run the Nightfall TUI:
@@ -8,6 +29,8 @@ Run the Nightfall TUI:
 ```bash
 ./nightfall.sh
 ```
+
+Or launch it from your application menu as "Nightfall Manager".
 
 ### Adding Plugins
 
