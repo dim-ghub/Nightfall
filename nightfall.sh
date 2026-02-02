@@ -144,7 +144,20 @@ get_available_plugins() {
 			for item in "$config_dir"/*; do
 				local item_name
 				item_name=$(basename "$item")
-				if [[ "$item_name" != "matugen" && -d "$item" ]]; then
+				if [[ "$item_name" == "matugen" && -d "$item" ]]; then
+					# Check matugen config.toml content
+					local plugin_config="$item/config.toml"
+					local user_config="$HOME_CONFIG/matugen/config.toml"
+					if [[ -f "$plugin_config" && -f "$user_config" ]]; then
+						if ! grep -qF "$(cat "$plugin_config")" "$user_config"; then
+							is_installed=false
+							break
+						fi
+					else
+						is_installed=false
+						break
+					fi
+				elif [[ -d "$item" ]]; then
 					local target_dir="$HOME_CONFIG/$item_name"
 					if [[ ! -d "$target_dir" ]]; then
 						is_installed=false
