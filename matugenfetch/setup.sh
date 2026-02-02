@@ -25,14 +25,20 @@ log_error() { printf "${RED}[ERROR]${NC} %s\n" "$1"; }
 # Script paths
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly FASTFETCH_DIR="$HOME/.config/fastfetch"
-readonly USER_SCRIPTS_DIR="$HOME/user_scripts/fastfetch"
+readonly FASTFETCH_SCRIPTS_DIR="$HOME/.config/fastfetch/scripts"
 readonly ZSHRC="$HOME/.zshrc"
 
-# Check if running from correct location
-check_location() {
-	if [[ ! -f "$SCRIPT_DIR/logogen.sh" ]]; then
-		log_error "logogen.sh not found in current directory"
-		log_info "Please run this script from the fastfetch-installer directory"
+# Check if required scripts exist in fastfetch scripts directory
+check_scripts() {
+	if [[ ! -f "$FASTFETCH_SCRIPTS_DIR/logogen.sh" ]]; then
+		log_error "logogen.sh not found in $FASTFETCH_SCRIPTS_DIR"
+		log_info "Please ensure logogen.sh is installed in ~/.config/fastfetch/scripts/"
+		exit 1
+	fi
+
+	if [[ ! -f "$FASTFETCH_SCRIPTS_DIR/fastfetch.sh" ]]; then
+		log_error "fastfetch.sh not found in $FASTFETCH_SCRIPTS_DIR"
+		log_info "Please ensure fastfetch.sh is installed in ~/.config/fastfetch/scripts/"
 		exit 1
 	fi
 }
@@ -66,38 +72,6 @@ check_dependencies() {
 	fi
 
 	log_success "All dependencies found"
-}
-
-# Install logogen.sh to fastfetch config directory
-install_logogen() {
-	log_info "Installing logogen.sh to fastfetch config directory..."
-
-	# Ensure fastfetch config directory exists
-	mkdir -p "$FASTFETCH_DIR"
-
-	# Copy logogen.sh
-	cp "$SCRIPT_DIR/logogen.sh" "$FASTFETCH_DIR/"
-	chmod +x "$FASTFETCH_DIR/logogen.sh"
-
-	log_success "logogen.sh installed to $FASTFETCH_DIR/"
-}
-
-# Create fastfetch wrapper script
-create_wrapper() {
-	log_info "Creating fastfetch wrapper script..."
-
-	# Ensure user scripts directory exists
-	mkdir -p "$USER_SCRIPTS_DIR"
-
-	cat >"$USER_SCRIPTS_DIR/fastfetch.sh" <<'EOF'
-#!/bin/bash
-export FASTFETCH_LOGO="$(~/.config/fastfetch/logogen.sh)"
-exec fastfetch "$@"
-EOF
-
-	chmod +x "$USER_SCRIPTS_DIR/fastfetch.sh"
-
-	log_success "fastfetch wrapper created at $USER_SCRIPTS_DIR/fastfetch.sh"
 }
 
 # Update fastfetch config
@@ -159,15 +133,15 @@ update_zshrc() {
 
 	local needs_reload=false
 
-	# Check if PATH already includes our directory
-	if ! grep -q "$USER_SCRIPTS_DIR" "$ZSHRC"; then
+	# Check if PATH already includes fastfetch scripts directory
+	if ! grep -q "$FASTFETCH_SCRIPTS_DIR" "$ZSHRC"; then
 		echo "" >>"$ZSHRC"
 		echo "# Fastfetch wrapper" >>"$ZSHRC"
-		echo "export PATH=\"$USER_SCRIPTS_DIR:\$PATH\"" >>"$ZSHRC"
-		log_success "Added fastfetch wrapper to PATH"
+		echo "export PATH=\"$FASTFETCH_SCRIPTS_DIR:\$PATH\"" >>"$ZSHRC"
+		log_success "Added fastfetch scripts directory to PATH"
 		needs_reload=true
 	else
-		log_info "PATH already includes fastfetch wrapper directory"
+		log_info "PATH already includes fastfetch scripts directory"
 	fi
 
 	# Check if alias already exists
@@ -189,8 +163,8 @@ test_setup() {
 	log_info "Testing the setup..."
 
 	# Test logogen script
-	if [[ -f "$FASTFETCH_DIR/logogen.sh" ]]; then
-		if output="$("$FASTFETCH_DIR/logogen.sh" 2>/dev/null)"; then
+	if [[ -f "$FASTFETCH_SCRIPTS_DIR/logogen.sh" ]]; then
+		if output="$("$FASTFETCH_SCRIPTS_DIR/logogen.sh" 2>/dev/null)"; then
 			log_success "logogen.sh working: $output"
 		else
 			log_error "logogen.sh failed"
@@ -202,7 +176,7 @@ test_setup() {
 	fi
 
 	# Test wrapper script
-	if [[ -f "$USER_SCRIPTS_DIR/fastfetch.sh" ]]; then
+	if [[ -f "$FASTFETCH_SCRIPTS_DIR/fastfetch.sh" ]]; then
 		log_success "fastfetch.sh wrapper found"
 	else
 		log_error "fastfetch.sh wrapper not found"
@@ -212,20 +186,18 @@ test_setup() {
 	log_success "Setup test completed successfully"
 }
 
-# Main installation
+# Main setup
 main() {
 	log_info "Starting fastfetch dynamic logo setup..."
 
-	check_location
+	check_scripts
 	check_dependencies
-	install_logogen
-	create_wrapper
 	update_config
 	update_zshrc
 	test_setup
 
 	echo ""
-	log_success "Installation completed!"
+	log_success "Setup completed!"
 	echo ""
 	log_info "Usage:"
 	echo "  1. Reload your shell: source ~/.zshrc"
