@@ -247,7 +247,7 @@ install_plugin() {
 	local setup_script="$plugin_dir/setup.sh"
 	if [[ -f "$setup_script" ]]; then
 		echo -e "${C_BLUE}Running setup script...${C_RESET}"
-		if bash "$setup_script"; then
+		if bash -i "$setup_script"; then
 			echo -e "  ${C_GREEN}✓${C_RESET} Setup script completed successfully"
 		else
 			echo -e "  ${C_RED}✗${C_RESET} Setup script failed"
