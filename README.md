@@ -36,3 +36,45 @@ my-plugin/
 ```
 
 The TUI will automatically handle the installation of configuration files based on this structure.
+
+## Available Plugins
+
+### dimfox
+Firefox theme customization that installs the textfox-rounded theme with rounded corners and no segment labels for a cleaner browsing experience.
+
+<!-- ![dimfox preview](images/dimfox.png) -->
+
+### textfox
+Firefox theme customization that installs the textfox theme with segment labels and standard corners for a detailed Firefox browsing experience.
+
+<!-- ![textfox preview](images/textfox.png) -->
+
+### spicedim
+Spicetify theme configuration that sets the "dim" theme with rounded corners, no segment labels, and matugen-generated colors for a cleaner Spotify interface.
+
+<!-- ![spicedim preview](images/spicedim.png) -->
+
+### spicetext
+Spicetify theme configuration that sets the "text" theme with segment labels and matugen-generated colors for a detailed Spotify interface.
+
+<!-- ![spicetext preview](images/spicetext.png) -->
+
+### steamatugen
+Desktop Steam theming setup with Decky Loader integration and matugen color theming for a customized Steam client experience.
+
+<!-- ![steamatugen preview](images/steamatugen.png) -->
+
+### waybar-tui
+Waybar configuration manager that switches to TUI style configuration by removing existing symlinks and creating new symlinks to the TUI config files, then restarts waybar to apply changes.
+
+<!-- ![waybar-tui preview](images/waybar-tui.png) -->
+
+### discordsys24
+Discord theme based on system24 with Catppuccin mocha colors that provides a TUI-style Discord interface with matugen integration for dynamic theming.
+
+<!-- ![discordsys24 preview](images/discordsys24.png) -->
+
+### matugenfetch
+A script that gets executed automatically by fastfetch to color the Arch logo with accents from your wallpaper.
+
+<!-- ![matugenfetch preview](images/matugenfetch.png) -->

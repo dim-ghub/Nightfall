@@ -1,0 +1,3 @@
+# waybar-tui
+
+Waybar configuration manager that switches to TUI style configuration by removing existing symlinks and creating new symlinks to the TUI config files, then restarts waybar to apply changes.
