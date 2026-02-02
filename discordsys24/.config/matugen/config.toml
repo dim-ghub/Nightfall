@@ -1,0 +1,19 @@
+[templates.sys24discord]
+input_path  = '~/.config/matugen/templates/sys24-discord.css'
+output_path = '~/.config/matugen/generated/sys24-discord.css'
+post_hook   = '''
+TARGETS=(
+  "$HOME/.config/vesktop/settings/quickCss.css"
+  "$HOME/.var/app/dev.vencord.Vesktop/config/vesktop/settings/quickCss.css"
+  "$HOME/.config/Vencord/settings/quickCss.css"
+  "$HOME/.config/equibop/settings/quickCss.css"
+  "$HOME/.var/app/org.equicord.equibop/config/equibop/settings/quickCss.css"
+  "$HOME/.config/Equicord/settings/quickCss.css"
+)
+
+for target in "${TARGETS[@]}"; do
+  if [ -d "$(dirname "$target")" ]; then
+    ln -nfs "$HOME/.config/matugen/generated/midnight-discord.css" "$target"
+  fi
+done
+'''
