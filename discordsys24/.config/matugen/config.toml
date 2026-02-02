@@ -13,7 +13,7 @@ TARGETS=(
 
 for target in "${TARGETS[@]}"; do
   if [ -d "$(dirname "$target")" ]; then
-    ln -nfs "$HOME/.config/matugen/generated/midnight-discord.css" "$target"
+    ln -nfs "$HOME/.config/matugen/generated/sys24-discord.css" "$target"
   fi
 done
 '''
