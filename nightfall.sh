@@ -207,18 +207,40 @@ handle_matugen_config() {
 
 draw_ui() {
 	local buf=""
-	local -i i current_col=3
+	local -i i
+
+	# Get terminal dimensions
+	local -i term_width term_height
+	local size
+	size=$(stty size 2>/dev/null || echo "24 80")
+	read -r term_height term_width <<<"$size"
+	((term_width == 0)) && term_width=80
+	((term_height == 0)) && term_height=24
+
+	# Use full terminal width/height for border
+	local -i content_width=$((term_width - 2))   # accounting for left and right border characters
+	local -i content_height=$((term_height - 6)) # border lines(3) + tabs(1) + controls(1) + spacing(1)
 
 	buf+="${CURSOR_HOME}"
 
-	# 66-char wide box (including borders)
-	buf+="${C_MAGENTA}┌────────────────────────────────────────────────────────────────┐${C_RESET}"$'\n'
+	# Draw full window border with title embedded
+	local title_text=" Nightfall Plugin Manager v1.0 "
+	local -i title_len=${#title_text}
+	local -i title_pos=$(((content_width - title_len) / 2))
 
-	# Center alignment
-	buf+="${C_MAGENTA}│$(printf '%*s' 18 '')${C_WHITE}Nightfall Plugin Manager ${C_CYAN}v1.0${C_MAGENTA}$(printf '%*s' 18 '')│${C_RESET}"$'\n'
+	# Top border with title (left aligned)
+	local title_text=" Nightfall Plugin Manager v1.0 "
+	local -i title_len=${#title_text}
 
+	# Top border with title
+	buf+="${C_MAGENTA}┌${C_WHITE}${title_text}${C_MAGENTA}"
+	for ((i = title_len; i < content_width; i++)); do buf+="─"; done
+	buf+="┐${C_RESET}"$'\n'
+
+	# Tab line with side borders
 	local tab_line="${C_MAGENTA}│ "
 	TAB_ZONES=()
+	local current_col=2
 
 	for ((i = 0; i < TAB_COUNT; i++)); do
 		local name=${TABS[i]}
@@ -226,33 +248,52 @@ draw_ui() {
 		local -i zone_start=$current_col
 
 		if ((i == CURRENT_TAB)); then
-			tab_line+="${C_CYAN}${C_INVERSE} ${name} ${C_RESET}${C_MAGENTA}│ "
+			tab_line+="${C_CYAN}${C_INVERSE} ${name} ${C_RESET}${C_MAGENTA} "
 		else
-			tab_line+="${C_GREY} ${name} ${C_MAGENTA}│ "
+			tab_line+="${C_GREY} ${name} ${C_MAGENTA} "
 		fi
 
-		TAB_ZONES+=("${zone_start}:$((zone_start + len + 1))")
-		((current_col += len + 4))
+		TAB_ZONES+=("${zone_start}:$((zone_start + len + 2))")
+		((current_col += len + 3))
 	done
 
-	# Box right border fix
-	local -i tab_line_len=$((current_col - 1))
-	local -i pad_needed=$((65 - tab_line_len))
-
-	((pad_needed > 0)) && tab_line+=$(printf '%*s' "$pad_needed" '')
-	tab_line+="${C_MAGENTA}│${C_RESET}"
+	# Pad to fill width and add right border
+	while ((current_col < content_width + 1)); do
+		tab_line+=" "
+		((current_col++))
+	done
+	tab_line+="│${C_RESET}"
 
 	buf+="${tab_line}"$'\n'
-	buf+="${C_MAGENTA}└────────────────────────────────────────────────────────────────┘${C_RESET}"$'\n'
+
+	# Separator line
+	buf+="${C_MAGENTA}├"
+	for ((i = 0; i < content_width; i++)); do buf+="─"; done
+	buf+="┤${C_RESET}"$'\n'
 
 	# Content based on current tab
+	local -i count
+	if ((CURRENT_TAB == 0)); then
+		count=${#AVAILABLE_PLUGINS[@]}
+	else
+		count=0
+		for plugin_name in "${AVAILABLE_PLUGINS[@]}"; do
+			local plugin_info="${PLUGIN_INFO[$plugin_name]}"
+			IFS='|' read -r title description installed <<<"$plugin_info"
+			if [[ "$installed" == "true" ]]; then
+				((count++))
+			fi
+		done
+	fi
+
+	((SELECTED_ROW >= count)) && SELECTED_ROW=$((count - 1))
+	((SELECTED_ROW < 0)) && SELECTED_ROW=0
+
+	# Display content within border
+	local -i displayed=0
 	if ((CURRENT_TAB == 0)); then
 		# Plugins tab
-		local -i count=${#AVAILABLE_PLUGINS[@]}
-		((SELECTED_ROW >= count)) && SELECTED_ROW=$((count - 1))
-		((SELECTED_ROW < 0)) && SELECTED_ROW=0
-
-		for ((i = 0; i < count; i++)); do
+		for ((i = 0; i < count && displayed < content_height; i++)); do
 			local plugin_name="${AVAILABLE_PLUGINS[i]}"
 			local plugin_info="${PLUGIN_INFO[$plugin_name]}"
 			IFS='|' read -r title description installed <<<"$plugin_info"
@@ -264,63 +305,75 @@ draw_ui() {
 				status_display="${C_GREY}Available${C_RESET}"
 			fi
 
+			buf+="${C_MAGENTA}│${C_RESET} "
 			if ((i == SELECTED_ROW)); then
 				buf+="${C_CYAN} ➤ ${C_INVERSE}"
-				buf+=$(printf '%-25s' "$title")
-				buf+="${C_RESET} : $status_display${CLR_EOL}"$'\n'
+				buf+=$(printf '%-*s' $((content_width - 17)) "$title")
+				buf+="${C_RESET} : $status_display"
 			else
-				buf+="   "
-				buf+=$(printf ' %-25s' "$title")
-				buf+=" : $status_display${CLR_EOL}"$'\n'
+				buf+="  "
+				buf+=$(printf '%-*s' $((content_width - 15)) "$title")
+				buf+=" : $status_display"
 			fi
+			buf+=" ${C_MAGENTA}│${C_RESET}"$'\n'
+			((displayed++))
 		done
 	else
 		# Installed tab
-		local -i count=0
-		INSTALLED_PLUGINS=()
-
+		local -i installed_idx=0
 		for plugin_name in "${AVAILABLE_PLUGINS[@]}"; do
 			local plugin_info="${PLUGIN_INFO[$plugin_name]}"
 			IFS='|' read -r title description installed <<<"$plugin_info"
 
 			if [[ "$installed" == "true" ]]; then
-				INSTALLED_PLUGINS+=("$plugin_name")
-				((count++))
-			fi
-		done
-
-		((SELECTED_ROW >= count)) && SELECTED_ROW=$((count - 1))
-		((SELECTED_ROW < 0)) && SELECTED_ROW=0
-
-		for ((i = 0; i < count; i++)); do
-			local plugin_name="${INSTALLED_PLUGINS[i]}"
-			local plugin_info="${PLUGIN_INFO[$plugin_name]}"
-			IFS='|' read -r title description installed <<<"$plugin_info"
-
-			if ((i == SELECTED_ROW)); then
-				buf+="${C_CYAN} ➤ ${C_INVERSE}"
-				buf+=$(printf '%-30s' "$title")
-				buf+="${C_RESET}${CLR_EOL}"$'\n'
-			else
-				buf+="   "
-				buf+=$(printf ' %-30s' "$title")
-				buf+="${CLR_EOL}"$'\n'
+				if ((installed_idx == SELECTED_ROW)); then
+					buf+="${C_MAGENTA}│${C_RESET} ${C_CYAN} ➤ ${C_INVERSE}"
+					buf+=$(printf '%-*s' $((content_width - 4)) "$title")
+					buf+="${C_RESET} ${C_MAGENTA}│${C_RESET}"$'\n'
+				else
+					buf+="${C_MAGENTA}│${C_RESET}  "
+					buf+=$(printf '%-*s' $((content_width - 4)) "$title")
+					buf+=" ${C_MAGENTA}│${C_RESET}"$'\n'
+				fi
+				((displayed++))
+				((installed_idx++))
 			fi
 		done
 	fi
 
-	for ((i = count; i < MAX_DISPLAY_ROWS; i++)); do
-		buf+="${CLR_EOL}"$'\n'
+	# Fill remaining content space
+	for ((i = displayed; i < content_height; i++)); do
+		buf+="${C_MAGENTA}│"
+		for ((j = 0; j < content_width; j++)); do buf+=" "; done
+		buf+="│${C_RESET}"$'\n'
 	done
 
-	# Help line
+	# Separator before controls
+	buf+="${C_MAGENTA}├"
+	for ((i = 0; i < content_width; i++)); do buf+="─"; done
+	buf+="┤${C_RESET}"$'\n'
+
+	# Controls line (sticky at bottom)
+	local controls=""
 	if ((CURRENT_TAB == 0)); then
-		buf+=$'\n'"${C_CYAN} [Tab] Switch Tab  [Enter] Install  [i] Plugin Info  [↑/↓ j/k] Nav  [q] Quit${C_RESET}"$'\n'
+		controls="[Tab] Switch Tab  [Enter] Install  [i] Plugin Info  [↑/↓ j/k] Nav  [q] Quit"
 	else
-		buf+=$'\n'"${C_CYAN} [Tab] Switch Tab  [i] Plugin Info  [↑/↓ j/k] Nav  [q] Quit${C_RESET}"$'\n'
+		controls="[Tab] Switch Tab  [i] Plugin Info  [↑/↓ j/k] Nav  [q] Quit"
 	fi
 
-	buf+="${C_CYAN} Directory: ${C_WHITE}${NIGHTFALL_DIR}${C_RESET}${CLR_EOL}${CLR_EOS}"
+	local -i controls_len=${#controls}
+	local -i controls_pos=$(((content_width - controls_len) / 2))
+
+	buf+="${C_MAGENTA}│"
+	for ((i = 0; i < controls_pos; i++)); do buf+=" "; done
+	buf+="${C_CYAN}${controls}${C_MAGENTA}"
+	for ((i = controls_pos + controls_len; i < content_width; i++)); do buf+=" "; done
+	buf+="│${C_RESET}"$'\n'
+
+	# Bottom border
+	buf+="${C_MAGENTA}└"
+	for ((i = 0; i < content_width; i++)); do buf+="─"; done
+	buf+="┘${C_RESET}${CLR_EOS}"
 
 	printf '%s' "$buf"
 }
@@ -330,7 +383,19 @@ show_plugin_info() {
 	if ((CURRENT_TAB == 0)); then
 		plugin_name="${AVAILABLE_PLUGINS[SELECTED_ROW]}"
 	else
-		plugin_name="${INSTALLED_PLUGINS[SELECTED_ROW]}"
+		# Find the SELECTED_ROW-th installed plugin
+		local -i installed_idx=0
+		for current_plugin in "${AVAILABLE_PLUGINS[@]}"; do
+			local plugin_info="${PLUGIN_INFO[$current_plugin]}"
+			IFS='|' read -r title description installed <<<"$plugin_info"
+			if [[ "$installed" == "true" ]]; then
+				if ((installed_idx == SELECTED_ROW)); then
+					plugin_name="$current_plugin"
+					break
+				fi
+				((installed_idx++))
+			fi
+		done
 	fi
 
 	clear
@@ -390,8 +455,8 @@ handle_mouse() {
 
 		[[ $type != "M" ]] && return 0
 
-		# Tab Row = 3
-		if ((y == 3)); then
+		# Tab Row = 2 (after top border and title)
+		if ((y == 2)); then
 			for ((i = 0; i < TAB_COUNT; i++)); do
 				zone=${TAB_ZONES[i]}
 				start=${zone%%:*}
@@ -403,13 +468,20 @@ handle_mouse() {
 			done
 		fi
 
-		# Item rows start at 5
-		local -i item_start_y=5
+		# Content rows start at 4 (after border, title, tabs, separator)
+		local -i item_start_y=4
 		local -i count
 		if ((CURRENT_TAB == 0)); then
 			count=${#AVAILABLE_PLUGINS[@]}
 		else
-			count=${#INSTALLED_PLUGINS[@]}
+			count=0
+			for plugin_name in "${AVAILABLE_PLUGINS[@]}"; do
+				local plugin_info="${PLUGIN_INFO[$plugin_name]}"
+				IFS='|' read -r title description installed <<<"$plugin_info"
+				if [[ "$installed" == "true" ]]; then
+					((count++))
+				fi
+			done
 		fi
 
 		if ((y >= item_start_y && y < item_start_y + count)); then
