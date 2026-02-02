@@ -50,6 +50,8 @@ readonly C_MAGENTA=$'\033[1;35m'
 readonly C_RED=$'\033[1;31m'
 readonly C_WHITE=$'\033[1;37m'
 readonly C_GREY=$'\033[1;30m'
+readonly C_YELLOW=$'\033[1;33m'
+readonly C_BLUE=$'\033[1;34m'
 readonly C_INVERSE=$'\033[7m'
 readonly CLR_EOL=$'\033[K'
 readonly CLR_EOS=$'\033[J'
@@ -187,14 +189,26 @@ install_plugin() {
 	local plugin_name="$1"
 	local plugin_dir="$NIGHTFALL_DIR/$plugin_name"
 
+	# Check if already installed
+	local plugin_info="${PLUGIN_INFO[$plugin_name]}"
+	IFS='|' read -r title description installed <<<"$plugin_info"
+	local action="Installing"
+	if [[ "$installed" == "true" ]]; then
+		action="Reinstalling/Updating"
+	fi
+
 	# Show plugin details
 	clear
-	echo -e "${C_CYAN}${C_INVERSE} Installing Plugin: $plugin_name ${C_RESET}"
+	echo -e "${C_CYAN}${C_INVERSE} $action Plugin: $plugin_name ${C_RESET}"
 	echo ""
 	get_plugin_details "$plugin_name"
 	echo ""
 
-	echo -e "${C_YELLOW}Press [Enter] to continue installation or [q] to cancel...${C_RESET}"
+	if [[ "$installed" == "true" ]]; then
+		echo -e "${C_YELLOW}Plugin is already installed. Press [Enter] to reinstall/update or [q] to cancel...${C_RESET}"
+	else
+		echo -e "${C_YELLOW}Press [Enter] to continue installation or [q] to cancel...${C_RESET}"
+	fi
 	read -rsn1 key
 	[[ "$key" == "q" || "$key" == "Q" ]] && return 0
 
@@ -242,7 +256,12 @@ install_plugin() {
 		fi
 	fi
 
-	echo -e "${C_GREEN}Plugin $plugin_name installed successfully!${C_RESET}"
+	if [[ "$installed" == "true" ]]; then
+		echo -e "${C_GREEN}Plugin $plugin_name reinstalled/updated successfully!${C_RESET}"
+	else
+		echo -e "${C_GREEN}Plugin $plugin_name installed successfully!${C_RESET}"
+	fi
+
 	read -p "Press Enter to continue..." -r
 
 	# Update plugin info
@@ -446,12 +465,18 @@ navigate() {
 	local -n items_ref="TAB_ITEMS_${CURRENT_TAB}"
 	local -i count=${#items_ref[@]}
 
-	((count == 0)) && return 0
+	((count == 0)) && {
+		SELECTED_ROW=0
+		return 0
+	}
 	((SELECTED_ROW += dir)) || :
 
-	# Wrap selection
-	((SELECTED_ROW < 0)) && SELECTED_ROW=$((count - 1))
-	((SELECTED_ROW >= count)) && SELECTED_ROW=0
+	# Wrap selection with bounds checking
+	if ((SELECTED_ROW < 0)); then
+		SELECTED_ROW=$((count - 1))
+	elif ((SELECTED_ROW >= count)); then
+		SELECTED_ROW=0
+	fi
 }
 
 switch_tab() {
@@ -480,10 +505,10 @@ handle_mouse() {
 	local -i button x y i
 	local type zone start end
 
-	# SGR Mouse Mode (1006)
-	if [[ $input == "[<"* ]]; then
-		# Parse SGR sequence: [0;10;5M or [0;10;5m
-		local temp_input=${input#[<}  # Remove leading "[<"
+	# SGR Mouse Mode (1006) - handle both [< and [< variations
+	if [[ $input == "[<"* || $input == "[<"* ]]; then
+		# Parse SGR sequence: [0;10;5M or [0;10;5m or [<0;10;5M or [<0;10;5m
+		local temp_input=${input#*[<} # Remove leading up to "[<"
 		temp_input=${temp_input%[Mm]} # Remove trailing M or m
 		IFS=';' read -r button x y <<<"$temp_input"
 		type=${input: -1} # Get last character (M or m)
@@ -551,6 +576,14 @@ main() {
 		# Safety: break on EOF to prevent 100% CPU loops
 		IFS= read -rsn1 key || break
 
+		# Debug: Show every key press
+		printf "DEBUG: Key read: %q (ASCII: %d)\n" "$key" "'$key" >>/tmp/nightfall_debug.log
+
+		# Handle Enter key that might be read as empty string (common with read -rsn1)
+		if [[ -z "$key" ]]; then
+			key=$'\n'
+		fi
+
 		if [[ $key == $'\x1b' ]]; then
 			seq=""
 			# Fast timeout for escape sequences
@@ -558,11 +591,16 @@ main() {
 				seq+="$char"
 			done
 
+			# Handle empty sequence (plain Escape key)
+			if [[ -z "$seq" ]]; then
+				continue
+			fi
+
 			case $seq in
 			'[Z') switch_tab -1 ;;      # Shift+Tab
 			'[A' | 'OA') navigate -1 ;; # Arrow Up
 			'[B' | 'OB') navigate 1 ;;  # Arrow Down
-			'['*'<'*) handle_mouse "$seq" ;;
+			'[<'* | '['*'<'*) handle_mouse "$seq" ;;
 			esac
 		else
 			case $key in
@@ -570,12 +608,20 @@ main() {
 			j | J) navigate 1 ;;
 			$'\t') switch_tab 1 ;;
 			i | I) show_plugin_info ;;
-			$'\n') # Enter key
-				if ((CURRENT_TAB == 0)); then
+			$'\n' | $'\r') # Enter key (handle LF and CR)
+				# Debug: Show we detected Enter key
+				echo "DEBUG: Enter key detected, tab=$CURRENT_TAB, row=$SELECTED_ROW" >>/tmp/nightfall_debug.log
+				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
 					install_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
+				elif ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
+					install_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
 				fi
 				;;
 			q | Q | $'\x03') break ;;
+			*)
+				# Debug: Show unknown keys
+				printf "DEBUG: Unknown key: %q (ASCII: %d)\n" "$key" "'$key" >>/tmp/nightfall_debug.log
+				;;
 			esac
 		fi
 	done
