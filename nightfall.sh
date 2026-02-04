@@ -22,7 +22,7 @@ export LC_NUMERIC=C
 readonly NIGHTFALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly HOME_CONFIG="$HOME/.config"
 readonly APP_TITLE="Nightfall Plugin Manager"
-readonly APP_VERSION="v1.7"
+readonly APP_VERSION="v1.8"
 readonly PLUGIN_CACHE_FILE="$HOME/.cache/nightfall_installed_plugins.txt"
 
 # Dimensions & Layout
