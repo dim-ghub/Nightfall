@@ -1,0 +1,11 @@
+# obsmatugen
+
+OBS Studio theme integration with matugen color generation for Catppuccin-themed recording overlays and UI elements. This plugin provides the Catppuccin color scheme that automatically adapts to your system colors, creating a cohesive dark theme for your recording setup.
+
+Features:
+- Catppuccin color scheme for OBS Studio
+- Automatic color generation with matugen integration
+- Dark theme optimized for recording overlays
+- UI element theming for professional streaming setup
+
+Note: Manual setup required in OBS Studio settings to enable theme.
