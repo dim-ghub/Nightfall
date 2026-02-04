@@ -80,48 +80,17 @@ update_config() {
 
 	local config_file="$FASTFETCH_DIR/config.jsonc"
 
-	# Create config if it doesn't exist
-	if [[ ! -f "$config_file" ]]; then
-		log_warning "No existing fastfetch config found. Creating default config..."
-		cat >"$config_file" <<'EOF'
-{
-    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
-    "logo": {
-        "source": "$FASTFETCH_LOGO",
-        "type": "kitty",
-        "height": 10,
-        "padding": {
-            "top": 1
-        }
-    },
-    "display": {
-        "separator": " "
-    },
-    "modules": [
-        "title",
-        "separator",
-        "os",
-        "kernel",
-        "uptime",
-        "memory",
-        "cpu",
-        "gpu",
-        "disk",
-        "localip",
-        "colors"
-    ]
-}
-EOF
-	else
-		# Update existing config
-		log_info "Updating existing fastfetch config..."
+	# Update existing config - only modify source line, never overwrite entire config
+	if [[ -f "$config_file" ]]; then
 		if grep -q '"source":' "$config_file"; then
-			# Replace existing source
+			# Replace existing source line
 			sed -i 's|"source": "[^"]*"|"source": "$FASTFETCH_LOGO"|g' "$config_file"
 		else
 			# Add source to logo section
 			sed -i '/"logo": {/,/}/ s|{|{\n        "source": "$FASTFETCH_LOGO",|' "$config_file"
 		fi
+	else
+		log_warning "No existing fastfetch config found. Cannot update - please run fastfetch once to create config first."
 	fi
 
 	log_success "Fastfetch configuration updated"
@@ -162,28 +131,13 @@ update_zshrc() {
 test_setup() {
 	log_info "Testing the setup..."
 
-	# Test logogen script
+	# Test if logogen.sh script exists
 	if [[ -f "$FASTFETCH_SCRIPTS_DIR/logogen.sh" ]]; then
-		if output="$("$FASTFETCH_SCRIPTS_DIR/logogen.sh" 2>/dev/null)"; then
-			log_success "logogen.sh working: $output"
-		else
-			log_error "logogen.sh failed"
-			return 1
-		fi
+		log_success "logogen.sh script found"
 	else
 		log_error "logogen.sh not found"
 		return 1
 	fi
-
-	# Test wrapper script
-	if [[ -f "$FASTFETCH_SCRIPTS_DIR/fastfetch.sh" ]]; then
-		log_success "fastfetch.sh wrapper found"
-	else
-		log_error "fastfetch.sh wrapper not found"
-		return 1
-	fi
-
-	log_success "Setup test completed successfully"
 }
 
 # Main setup

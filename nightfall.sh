@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # =============================================================================
-# Nightfall Plugin Manager TUI (v1.6)
+# Nightfall Plugin Manager TUI
 # =============================================================================
 # Target: Arch Linux / Plugin Management
 # Description: Interactive TUI to manage Nightfall plugins and configurations.
@@ -22,7 +22,7 @@ export LC_NUMERIC=C
 readonly NIGHTFALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly HOME_CONFIG="$HOME/.config"
 readonly APP_TITLE="Nightfall Plugin Manager"
-readonly APP_VERSION="v1.6"
+readonly APP_VERSION="v1.7"
 readonly PLUGIN_CACHE_FILE="$HOME/.cache/nightfall_installed_plugins.txt"
 
 # Dimensions & Layout
@@ -558,12 +558,26 @@ uninstall_plugin() {
 						local template_name=$(basename "$template_file")
 						rm -f "$template_dir/$template_name"
 					done
+					# Remove template directory if empty
+					rmdir "$template_dir" 2>/dev/null || true
 				fi
 			elif [[ -d "$item" ]]; then
-				# Remove directory from user config
+				# Remove only the specific files/dirs from plugin, not all contents
 				local target_dir="$HOME_CONFIG/$item_name"
 				if [[ -d "$target_dir" ]]; then
-					rm -rf "$target_dir"
+					# Remove each item that exists in both plugin and target
+					for plugin_item in "$item"/*; do
+						local plugin_item_name=$(basename "$plugin_item")
+						if [[ -e "$target_dir/$plugin_item_name" ]]; then
+							if [[ -d "$plugin_item" ]]; then
+								rm -rf "$target_dir/$plugin_item_name"
+							else
+								rm -f "$target_dir/$plugin_item_name"
+							fi
+						fi
+					done
+					# Remove directory if empty
+					rmdir "$target_dir" 2>/dev/null || true
 				fi
 			elif [[ -f "$item" ]]; then
 				# Remove file from user config
@@ -574,9 +588,6 @@ uninstall_plugin() {
 			fi
 		done
 	fi
-
-	# Remove plugin from cache and refresh available plugins
-	get_available_plugins
 
 	# Execute theme refresh
 	if [[ -f "$HOME/user_scripts/theme_matugen/theme_ctl.sh" ]]; then
