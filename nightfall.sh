@@ -152,7 +152,7 @@ add_plugin_to_cache() {
 		echo "nightfall_v1"
 		echo "$cache_output"
 		echo "$plugin_name"
-	} | grep -v '^$' | sort -u >"$temp_file" && mv "$temp_file" "$PLUGIN_CACHE_FILE"
+	} | grep -v '^$' | tail -n +2 | sort -u | awk 'BEGIN{print "nightfall_v1"} {print}' >"$temp_file" && mv "$temp_file" "$PLUGIN_CACHE_FILE"
 }
 
 remove_plugin_from_cache() {
@@ -176,53 +176,11 @@ validate_cache() {
 	local valid_plugins=""
 	local needs_update=false
 
-	# Check each cached plugin if it's still actually installed
+	# Check each cached plugin - cache takes precedence over filesystem checks
 	while IFS= read -r plugin_name; do
 		if [[ -n "$plugin_name" ]]; then
-			local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
-			local config_dir="$plugin_dir/.config"
-
-			if [[ -d "$config_dir" ]]; then
-				local still_installed=true
-				for item in "$config_dir"/*; do
-					local item_name
-					item_name=$(basename "$item")
-					if [[ "$item_name" == "matugen" && -d "$item" ]]; then
-						# Check matugen config.toml content
-						local plugin_config="$item/config.toml"
-						local user_config="$HOME_CONFIG/matugen/config.toml"
-						if [[ -f "$plugin_config" && -f "$user_config" ]]; then
-							if ! grep -qF "$(cat "$plugin_config")" "$user_config"; then
-								still_installed=false
-								break
-							fi
-						else
-							still_installed=false
-							break
-						fi
-					elif [[ -d "$item" ]]; then
-						local target_dir="$HOME_CONFIG/$item_name"
-						if [[ ! -d "$target_dir" ]]; then
-							still_installed=false
-							break
-						fi
-					elif [[ -f "$item" ]]; then
-						local target_file="$HOME_CONFIG/$item_name"
-						if [[ ! -f "$target_file" ]]; then
-							still_installed=false
-							break
-						fi
-					fi
-				done
-
-				if [[ "$still_installed" == "true" ]]; then
-					valid_plugins+="${valid_plugins:+$'\n'}$plugin_name"
-				else
-					needs_update=true
-				fi
-			else
-				needs_update=true
-			fi
+			# Cache takes precedence - if it's in cache, consider it installed
+			valid_plugins+="${valid_plugins:+$'\n'}$plugin_name"
 		fi
 	done <<<"$cache_output"
 
@@ -321,7 +279,10 @@ get_available_plugins() {
 					fi
 				done
 
-				if [[ "$filesystem_check" == "true" ]]; then
+				# Cache takes precedence - if cache says installed, trust it
+				if is_plugin_cached_installed "$plugin"; then
+					is_installed=true
+				elif [[ "$filesystem_check" == "true" ]]; then
 					is_installed=true
 					# Update cache with filesystem verification result
 					add_plugin_to_cache "$plugin"
@@ -329,6 +290,12 @@ get_available_plugins() {
 			fi
 
 			if [[ "$is_installed" == "true" ]]; then
+				PLUGIN_INFO["$plugin"]=$(echo "${PLUGIN_INFO[$plugin]}" | sed 's/|false$/|true/')
+				TAB_ITEMS_1+=("$plugin")
+			fi
+		else
+			# Cache takes precedence over filesystem checks
+			if is_plugin_cached_installed "$plugin"; then
 				PLUGIN_INFO["$plugin"]=$(echo "${PLUGIN_INFO[$plugin]}" | sed 's/|false$/|true/')
 				TAB_ITEMS_1+=("$plugin")
 			fi
