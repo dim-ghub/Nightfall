@@ -356,7 +356,7 @@ get_plugin_details() {
 	local config_dir="$plugin_dir/.config"
 	if [[ -d "$config_dir" ]]; then
 		echo "${C_CYAN}Configuration Files:${C_RESET}"
-		find "$config_dir" -type f -o -type d | sed 's|.*/|  |'
+		find "$config_dir" -type f -o -type d | grep -v previews | sed 's|.*/|  |'
 	fi
 }
 
@@ -405,6 +405,10 @@ install_plugin() {
 
 			if [[ "$item_name" == "matugen" ]]; then
 				handle_matugen_config "$item"
+			elif [[ "$item_name" == "previews" ]]; then
+				# Skip previews folders
+				echo -e "  ${C_GREY}⚠${C_RESET} Skipping previews folder"
+				continue
 			else
 				# Copy other folders directly
 				if [[ -d "$item" ]]; then
