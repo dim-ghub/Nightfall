@@ -442,6 +442,148 @@ get_plugin_toggle_status() {
 	fi
 }
 
+toggle_plugin() {
+	local plugin_name="$1"
+	local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
+	local matugen_config="$HOME_CONFIG/matugen/config.toml"
+	local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
+
+	# Check if plugin has matugen config
+	if [[ ! -f "$matugen_plugin_config" ]]; then
+		return 0
+	fi
+
+	# Extract template name
+	local template_name
+	template_name=$(grep -m1 '^\[templates\.' "$matugen_plugin_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
+	[[ -z "$template_name" ]] && return 0
+
+	# Check if currently enabled
+	local is_enabled=false
+	if grep -q "^\[templates\.$template_name\]" "$matugen_config" 2>/dev/null; then
+		is_enabled=true
+	fi
+
+	if [[ "$is_enabled" == "true" ]]; then
+		# Turn off: comment out the block
+		awk -v template="[templates.$template_name]" '
+			$0 == template { 
+				print "#" $0
+				in_block=1
+				next 
+			}
+			in_block && /^\[.*\]/ { 
+				in_block=0
+				print
+				next
+			}
+			in_block { 
+				print "#" $0
+				next 
+			}
+			{ print }
+		' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+	else
+		# Turn on: uncomment the block
+		awk -v template="[templates.$template_name]" '
+			/^#/ && $0 == "#" template { 
+				print substr($0, 2)
+				in_block=1
+				next 
+			}
+			in_block && /^#/ && !/^\s*$/ { 
+				print substr($0, 2)
+				next 
+			}
+			in_block && /^\[.*\]/ { 
+				in_block=0
+				print
+				next
+			}
+			{ print }
+		' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+	fi
+
+	# Execute theme refresh silently
+	if [[ -f "$HOME/user_scripts/theme_matugen/theme_ctl.sh" ]]; then
+		bash "$HOME/user_scripts/theme_matugen/theme_ctl.sh" refresh >/dev/null 2>&1
+	fi
+}
+
+uninstall_plugin() {
+	local plugin_name="$1"
+	local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
+	local matugen_config="$HOME_CONFIG/matugen/config.toml"
+	local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
+
+	# Remove from cache
+	remove_plugin_from_cache "$plugin_name"
+
+	# Remove block from matugen config if plugin has matugen config
+	if [[ -f "$matugen_plugin_config" ]]; then
+		# Extract template name
+		local template_name
+		template_name=$(grep -m1 '^\[templates\.' "$matugen_plugin_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
+
+		if [[ -n "$template_name" ]]; then
+			# Remove the entire block from matugen config
+			awk -v template="[templates.$template_name]" '
+				$0 == template { 
+					in_block=1
+					skip_block=1
+					next 
+				}
+				skip_block && /^\[.*\]/ { 
+					skip_block=0
+					next
+				}
+				skip_block { next }
+				{ print }
+			' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+		fi
+	fi
+
+	# Remove files using the same checks as filesystem validation
+	local config_dir="$plugin_dir/.config"
+	if [[ -d "$config_dir" ]]; then
+		for item in "$config_dir"/*; do
+			local item_name
+			item_name=$(basename "$item")
+
+			if [[ "$item_name" == "matugen" && -d "$item" ]]; then
+				# Remove matugen templates (not config.toml)
+				local template_dir="$HOME_CONFIG/matugen/templates"
+				if [[ -d "$template_dir" ]]; then
+					for template_file in "$item"/*; do
+						local template_name=$(basename "$template_file")
+						rm -f "$template_dir/$template_name"
+					done
+				fi
+			elif [[ -d "$item" ]]; then
+				# Remove directory from user config
+				local target_dir="$HOME_CONFIG/$item_name"
+				if [[ -d "$target_dir" ]]; then
+					rm -rf "$target_dir"
+				fi
+			elif [[ -f "$item" ]]; then
+				# Remove file from user config
+				local target_file="$HOME_CONFIG/$item_name"
+				if [[ -f "$target_file" ]]; then
+					rm -f "$target_file"
+				fi
+			fi
+		done
+	fi
+
+	# Remove plugin from cache and refresh available plugins
+	get_available_plugins
+
+	# Execute theme refresh
+	if [[ -f "$HOME/user_scripts/theme_matugen/theme_ctl.sh" ]]; then
+		bash "$HOME/user_scripts/theme_matugen/theme_ctl.sh" refresh >/dev/null 2>&1
+	fi
+}
+
 handle_matugen_config() {
 	local matugen_dir="$1"
 
@@ -700,20 +842,22 @@ draw_ui() {
 			display="${C_WHITE}${title}${C_RESET}"
 		fi
 
-		# Add toggle status for plugins with matugen configs
-		local plugin_dir="$NIGHTFALL_DIR/plugins/$item"
-		local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
+		# Add toggle status for installed plugins with matugen configs
+		if [[ "$installed" == "true" ]]; then
+			local plugin_dir="$NIGHTFALL_DIR/plugins/$item"
+			local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
 
-		if [[ -f "$matugen_plugin_config" ]]; then
-			# Extract template name
-			local template_name
-			template_name=$(grep -m1 '^\[templates\.' "$matugen_plugin_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
+			if [[ -f "$matugen_plugin_config" ]]; then
+				# Extract template name
+				local template_name
+				template_name=$(grep -m1 '^\[templates\.' "$matugen_plugin_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
 
-			if [[ -n "$template_name" ]]; then
-				if grep -q "^\[templates\.$template_name\]" "$HOME_CONFIG/matugen/config.toml" 2>/dev/null; then
-					display+=" ${C_GREEN}[ON]${C_RESET}"
-				else
-					display+=" ${C_RED}[OFF]${C_RESET}"
+				if [[ -n "$template_name" ]]; then
+					if grep -q "^\[templates\.$template_name\]" "$HOME_CONFIG/matugen/config.toml" 2>/dev/null; then
+						display+=" ${C_GREEN}[ON]${C_RESET}"
+					else
+						display+=" ${C_RED}[OFF]${C_RESET}"
+					fi
 				fi
 			fi
 		fi
@@ -750,14 +894,17 @@ draw_ui() {
 
 	# Controls line
 	local controls=""
+	local nav=""
 	if ((CURRENT_TAB == 0)); then
-		controls="[Tab] Switch Tab  [Enter] Install  [i] Plugin Info  [↑/↓ j/k] Nav  [q] Quit"
+		controls="[Tab] Switch Tab  [Enter] Install  [i] Plugin Info  [q] Quit"
+		nav="[↑/↓] Navigate  [←/→] Toggle"
 	else
-		controls="[Tab] Switch Tab  [i] Plugin Info  [↑/↓ j/k] Nav  [q] Quit"
+		controls="[Tab] Switch Tab  [u] Uninstall  [i] Plugin Info  [q] Quit"
+		nav="[↑/↓] Navigate  [←/→] Toggle"
 	fi
 
-	buf+=$'\n'"${C_CYAN} ${controls}${C_RESET}"$'\n'
-	buf+="${C_CYAN} Directory: ${C_WHITE}${NIGHTFALL_DIR}${C_RESET}${CLR_EOL}${CLR_EOS}"
+	buf+=$'\n'"${C_CYAN} ${controls}${C_RESET}${CLR_EOL}"$'\n'
+	buf+="${C_CYAN} ${nav}${C_RESET}${CLR_EOL}"$'\n'"${CLR_EOS}"
 
 	printf '%s' "$buf"
 }
@@ -940,9 +1087,13 @@ main() {
 		else
 			case $key in
 			k | K) navigate -1 ;;
-			j | J) navigate 1 ;;
 			$'\t') switch_tab 1 ;;
 			i | I) show_plugin_info ;;
+			u | U) # Uninstall plugin
+				if ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
+					uninstall_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
+				fi
+				;;
 			$'\n' | $'\r') # Enter key (handle LF and CR)
 				# Debug: Show we detected Enter key
 				echo "DEBUG: Enter key detected, tab=$CURRENT_TAB, row=$SELECTED_ROW" >>/tmp/nightfall_debug.log
