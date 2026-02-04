@@ -1,10 +1,18 @@
 #!/bin/bash
 
-# Set Spicetify theme to dim
+# Check if spicetify is available
+if ! command -v spicetify &>/dev/null; then
+	echo "Warning: spicetify not found. Skipping theme configuration."
+	exit 0
+fi
+
+echo "Setting Spicetify theme to dim..."
 spicetify config theme dim
 
-# Set color scheme to matugen
+echo "Setting color scheme to matugen..."
 spicetify config color_scheme matugen
 
-# Apply the changes
+echo "Applying Spicetify changes..."
 spicetify apply
+
+echo "Spicetify dim theme with matugen colors configured!"
