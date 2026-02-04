@@ -256,7 +256,7 @@ get_available_plugins() {
 	TAB_ITEMS_1=()
 
 	# Validate cache to detect manually removed plugins
-	validate_cache
+	validate_cache || true
 
 	for dir in "$NIGHTFALL_DIR/plugins"/*/; do
 		if [[ -d "$dir" && -f "${dir}info" && "$(basename "$dir")" != "arch_iso_scripts" ]]; then
