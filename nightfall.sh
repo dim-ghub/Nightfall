@@ -408,10 +408,16 @@ install_plugin() {
 		echo -e "${C_GREEN}Plugin $plugin_name installed successfully!${C_RESET}"
 	fi
 
-	read -p "Press Enter to continue..." -r
-
 	# Update cache instead of refreshing all plugins
 	add_plugin_to_cache "$plugin_name"
+
+	# Execute theme refresh after installation
+	if [[ -f "$HOME/user_scripts/theme_matugen/theme_ctl.sh" ]]; then
+		echo -e "${C_BLUE}Refreshing theme...${C_RESET}"
+		bash "$HOME/user_scripts/theme_matugen/theme_ctl.sh" refresh
+	fi
+
+	read -p "Press Enter to continue..." -r
 }
 
 handle_matugen_config() {
@@ -801,6 +807,7 @@ handle_mouse() {
 				if ((button == 0 && CURRENT_TAB == 0)); then
 					# Left click on Plugins tab - install plugin
 					install_plugin "${items_ref[SELECTED_ROW]}"
+					get_available_plugins
 				fi
 			fi
 		fi
@@ -887,8 +894,10 @@ main() {
 				echo "DEBUG: Enter key detected, tab=$CURRENT_TAB, row=$SELECTED_ROW" >>/tmp/nightfall_debug.log
 				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
 					install_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
+					get_available_plugins
 				elif ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
 					install_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
+					get_available_plugins
 				fi
 				;;
 			q | Q | $'\x03') break ;;
