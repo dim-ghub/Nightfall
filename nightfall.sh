@@ -493,19 +493,27 @@ smart_merge_matugen_config() {
 		# Extract existing section including the title
 		local existing_section
 		existing_section=$(awk -v section="$plugin_title" '
-			BEGIN { found=0 }
-			$0 == section { found=1; print; next }
-			found && /^\[/ { exit }
-			found { print }
-		' "$target_config")
+				BEGIN { found=0 }
+				$0 == section { found=1; print; next }
+				found && /^\[/ { exit }
+				found { print }
+			' "$target_config")
 
 		# Normalize both for comparison (remove leading/trailing whitespace)
 		local plugin_clean existing_clean
 		plugin_clean=$(echo "$plugin_content" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
-		existing_clean=$(echo "$existing_section" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+		existing_clean=$(echo "$existing_section" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' || true)
 
 		if [[ "$plugin_clean" == "$existing_clean" ]]; then
 			echo -e "    ${C_GREY}✓${C_RESET} Config already exists, skipping"
+			return 0
+		fi
+
+		# If section doesn't exist at all, just append it
+		if [[ -z "$existing_clean" ]]; then
+			echo "" >>"$target_config"
+			echo "$plugin_content" >>"$target_config"
+			echo -e "    ${C_GREY}✓${C_RESET} Added new config section"
 			return 0
 		fi
 
