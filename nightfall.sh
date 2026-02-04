@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # =============================================================================
-# Nightfall Plugin Manager TUI (v1.1)
+# Nightfall Plugin Manager TUI (v1.6)
 # =============================================================================
 # Target: Arch Linux / Plugin Management
 # Description: Interactive TUI to manage Nightfall plugins and configurations.
@@ -22,7 +22,7 @@ export LC_NUMERIC=C
 readonly NIGHTFALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly HOME_CONFIG="$HOME/.config"
 readonly APP_TITLE="Nightfall Plugin Manager"
-readonly APP_VERSION="v1.3"
+readonly APP_VERSION="v1.6"
 readonly PLUGIN_CACHE_FILE="$HOME/.cache/nightfall_installed_plugins.txt"
 
 # Dimensions & Layout
@@ -179,7 +179,7 @@ validate_cache() {
 	# Check each cached plugin if it's still actually installed
 	while IFS= read -r plugin_name; do
 		if [[ -n "$plugin_name" ]]; then
-			local plugin_dir="$NIGHTFALL_DIR/$plugin_name"
+			local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
 			local config_dir="$plugin_dir/.config"
 
 			if [[ -d "$config_dir" ]]; then
@@ -258,7 +258,7 @@ get_available_plugins() {
 	# Validate cache to detect manually removed plugins
 	validate_cache
 
-	for dir in "$NIGHTFALL_DIR"/*/; do
+	for dir in "$NIGHTFALL_DIR/plugins"/*/; do
 		if [[ -d "$dir" && -f "${dir}info" && "$(basename "$dir")" != "arch_iso_scripts" ]]; then
 			local plugin_name
 			plugin_name=$(basename "$dir")
@@ -278,7 +278,7 @@ get_available_plugins() {
 
 	# Check installed status using cache first
 	for plugin in "${AVAILABLE_PLUGINS[@]}"; do
-		local plugin_dir="$NIGHTFALL_DIR/$plugin"
+		local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin"
 		local config_dir="$plugin_dir/.config"
 
 		if [[ -d "$config_dir" ]]; then
@@ -338,7 +338,7 @@ get_available_plugins() {
 
 get_plugin_details() {
 	local plugin_name="$1"
-	local plugin_dir="$NIGHTFALL_DIR/$plugin_name"
+	local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
 
 	echo "Plugin: ${C_WHITE}$plugin_name${C_RESET}"
 	echo "Directory: ${C_GREY}$plugin_dir${C_RESET}"
@@ -362,7 +362,7 @@ get_plugin_details() {
 
 install_plugin() {
 	local plugin_name="$1"
-	local plugin_dir="$NIGHTFALL_DIR/$plugin_name"
+	local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
 
 	# Check if already installed
 	local plugin_info="${PLUGIN_INFO[$plugin_name]}"
