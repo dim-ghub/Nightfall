@@ -227,18 +227,22 @@ setup_matugen_themes() {
 configure_sudoers() {
 	log_info "Configuring sudoers for plugin_loader..."
 
-	local rule="ALL ALL=(ALL) NOPASSWD: /bin/systemctl restart plugin_loader"
+	local restart_rule="ALL ALL=(ALL) NOPASSWD: /bin/systemctl restart plugin_loader"
+	local start_rule="ALL ALL=(ALL) NOPASSWD: /bin/systemctl start plugin_loader"
+	local stop_rule="ALL ALL=(ALL) NOPASSWD: /bin/systemctl stop plugin_loader"
+	local enable_rule="ALL ALL=(ALL) NOPASSWD: /bin/systemctl enable plugin_loader"
+	local disable_rule="ALL ALL=(ALL) NOPASSWD: /bin/systemctl disable plugin_loader"
 	local sudoers_dropin="/etc/sudoers.d/decky-plugin-loader"
 
-	# Check if rule already exists
-	if sudo grep -Fq "$rule" "$sudoers_dropin" 2>/dev/null; then
-		log_success "Sudoers rule already exists"
-		return 0
-	fi
-
-	log_info "Adding sudoers rule..."
-
-	echo "$rule" | sudo tee "$sudoers_dropin" >/dev/null
+	# Create sudoers file with all necessary rules
+	cat <<EOF | sudo tee "$sudoers_dropin" >/dev/null
+# Decky Loader plugin_loader service controls
+$restart_rule
+$start_rule
+$stop_rule
+$enable_rule
+$disable_rule
+EOF
 
 	# Fix permissions (sudo requires 0440)
 	sudo chmod 0440 "$sudoers_dropin"
@@ -246,40 +250,168 @@ configure_sudoers() {
 	# Validate sudoers config
 	if ! sudo visudo -cf "$sudoers_dropin"; then
 		sudo rm -f "$sudoers_dropin"
-		die "Invalid sudoers configuration — rule reverted"
+		die "Invalid sudoers configuration — rules reverted"
 	fi
 
-	log_success "Sudoers rule added successfully"
+	log_success "Sudoers rules added successfully for full service control"
+}
 
-	# Restart plugin_loader if it exists
-	if sudo systemctl restart plugin_loader 2>/dev/null; then
-		log_success "Plugin loader service restarted"
+# Service control functions
+start_plugin_loader() {
+	log_info "Starting plugin_loader service..."
+	if sudo systemctl start plugin_loader 2>/dev/null; then
+		log_success "plugin_loader service started"
 	else
-		log_warn "plugin_loader service not found or not running yet"
+		log_warn "Failed to start plugin_loader service"
 	fi
+}
+
+stop_plugin_loader() {
+	log_info "Stopping plugin_loader service..."
+	if sudo systemctl stop plugin_loader 2>/dev/null; then
+		log_success "plugin_loader service stopped"
+	else
+		log_warn "Failed to stop plugin_loader service"
+	fi
+}
+
+enable_plugin_loader() {
+	log_info "Enabling plugin_loader service..."
+	if sudo systemctl enable plugin_loader 2>/dev/null; then
+		log_success "plugin_loader service enabled"
+	else
+		log_warn "Failed to enable plugin_loader service"
+	fi
+}
+
+disable_plugin_loader() {
+	log_info "Disabling plugin_loader service..."
+	if sudo systemctl disable plugin_loader 2>/dev/null; then
+		log_success "plugin_loader service disabled"
+	else
+		log_warn "Failed to disable plugin_loader service"
+	fi
+}
+
+# --- Flag Handling ---
+
+# Handle command line arguments
+ACTION=""
+case "${1:-}" in
+--uninstall)
+	ACTION="uninstall"
+	;;
+--on)
+	ACTION="on"
+	;;
+--off)
+	ACTION="off"
+	;;
+*)
+	ACTION="install"
+	;;
+esac
+
+# Action handlers
+handle_uninstall() {
+	log_info "Performing complete Steam Matugen cleanup..."
+
+	# Stop and disable plugin_loader service
+	stop_plugin_loader
+	disable_plugin_loader
+
+	# Remove entire homebrew directory (Decky Loader)
+	if [[ -d "$HOME/homebrew" ]]; then
+		log_info "Removing Decky Loader and all plugins..."
+		rm -rf "$HOME/homebrew"
+		log_success "Decky Loader and all plugins removed"
+	fi
+
+	# Remove sudoers rule
+	local sudoers_dropin="/etc/sudoers.d/decky-plugin-loader"
+	if sudo [[ -f "$sudoers_dropin" ]]; then
+		log_info "Removing sudoers rule..."
+		sudo rm -f "$sudoers_dropin"
+		log_success "Sudoers rule removed"
+	fi
+
+	log_success "Complete Steam Matugen cleanup performed!"
+	log_info "Decky Loader, all plugins, themes, and service configurations have been removed."
+}
+
+handle_on() {
+	log_info "Enabling Steam Matugen theme..."
+	check_requirements
+
+	# Enable and start plugin_loader service
+	enable_plugin_loader
+	start_plugin_loader
+
+	# Ensure themes are properly linked
+	setup_matugen_themes
+
+	log_success "Steam Matugen theme enabled!"
+	log_info "plugin_loader service is running. Configure themes using CSS Loader plugin in Decky Loader"
+}
+
+handle_off() {
+	log_info "Disabling Steam Matugen theme..."
+
+	# Stop plugin_loader service only
+	stop_plugin_loader
+
+	log_success "Steam Matugen theme disabled!"
+	log_info "plugin_loader service is stopped. Other themes remain available in CSS Loader"
+}
+
+handle_off() {
+	log_info "Disabling Steam Matugen theme..."
+
+	# Remove the Matugen theme symlink
+	local css_loader_theme_dir="$HOME/homebrew/themes/Matugen"
+	if [[ -L "$css_loader_theme_dir/theme.css" ]]; then
+		rm -f "$css_loader_theme_dir/theme.css"
+		log_success "Removed Matugen theme symlink"
+	fi
+
+	log_success "Steam Matugen theme disabled!"
+	log_info "Other themes remain available in CSS Loader"
 }
 
 # --- Execution ---
 
 main() {
-	check_requirements
-	install_decky_loader
-	install_css_loader
-	setup_matugen_themes
-	configure_sudoers
+	case "$ACTION" in
+	uninstall)
+		handle_uninstall
+		;;
+	on)
+		handle_on
+		;;
+	off)
+		handle_off
+		;;
+	install | *)
+		check_requirements
+		install_decky_loader
+		install_css_loader
+		setup_matugen_themes
+		configure_sudoers
 
-	echo ""
-	log_success "Steam Matugen setup complete!"
-	log_info "If colors are missing, run 'matugen' to generate them."
-	echo ""
-	log_info "Installation Summary:"
-	log_info "✅ Decky Loader: ~/homebrew/"
-	log_info "✅ CSS Loader: ~/homebrew/plugins/SDH-CssLoader"
-	log_info "✅ Themes: ~/homebrew/themes/"
-	log_info "✅ Sudoers: Passwordless plugin_loader restart configured"
-	echo ""
-	log_info "🔄 Please restart Steam to see all changes in the Steam UI"
-	log_info "🎨 Configure themes using the CSS Loader plugin in Decky Loader"
+		echo ""
+		log_success "Steam Matugen setup complete!"
+		log_info "If colors are missing, run 'matugen' to generate them."
+		echo ""
+		log_info "Installation Summary:"
+		log_info "✅ Decky Loader: ~/homebrew/"
+		log_info "✅ CSS Loader: ~/homebrew/plugins/SDH-CssLoader"
+		log_info "✅ Themes: ~/homebrew/themes/"
+		log_info "✅ Sudoers: Passwordless plugin_loader restart configured"
+		echo ""
+		log_info "🔄 Please restart Steam to see all changes in Steam UI"
+		log_info "🎨 Configure themes using CSS Loader plugin in Decky Loader"
+		;;
+	esac
 }
 
 main "$@"

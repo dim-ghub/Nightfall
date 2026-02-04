@@ -9,6 +9,23 @@
 
 set -euo pipefail
 
+# Handle command line arguments
+ACTION=""
+case "${1:-}" in
+--uninstall)
+	ACTION="uninstall"
+	;;
+--on)
+	ACTION="on"
+	;;
+--off)
+	ACTION="off"
+	;;
+*)
+	ACTION="install"
+	;;
+esac
+
 # Colors for output
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -83,17 +100,20 @@ update_config() {
 	# Update existing config - only modify source line, never overwrite entire config
 	if [[ -f "$config_file" ]]; then
 		if grep -q '"source":' "$config_file"; then
-			# Replace existing source line
+			# Replace existing source line with variable
 			sed -i 's|"source": "[^"]*"|"source": "$FASTFETCH_LOGO"|g' "$config_file"
 		else
 			# Add source to logo section
 			sed -i '/"logo": {/,/}/ s|{|{\n        "source": "$FASTFETCH_LOGO",|' "$config_file"
 		fi
+
+		# Ensure it's not commented out
+		sed -i 's|#"source": "|        "source": "|g' "$config_file"
 	else
 		log_warning "No existing fastfetch config found. Cannot update - please run fastfetch once to create config first."
 	fi
 
-	log_success "Fastfetch configuration updated"
+	log_success "Fastfetch configuration updated with variable logo source"
 }
 
 # Update zshrc
@@ -140,25 +160,98 @@ test_setup() {
 	fi
 }
 
+# Action handlers
+handle_uninstall() {
+	log_info "Uninstalling fastfetch dynamic logo setup..."
+
+	# Remove fastfetch alias from .zshrc
+	if [[ -f "$ZSHRC" ]]; then
+		sed -i '/# Fastfetch wrapper/,+1d' "$ZSHRC"
+		sed -i '/alias fastfetch=/d' "$ZSHRC"
+		log_success "Removed fastfetch alias from .zshrc"
+	fi
+
+	# Remove scripts directory
+	if [[ -d "$FASTFETCH_SCRIPTS_DIR" ]]; then
+		rm -rf "$FASTFETCH_SCRIPTS_DIR"
+		log_success "Removed fastfetch scripts directory"
+	fi
+
+	# Remove generated pngs directory
+	if [[ -d "$HOME/.config/fastfetch/pngs" ]]; then
+		rm -rf "$HOME/.config/fastfetch/pngs"
+		log_success "Removed generated pngs directory"
+	fi
+
+	# Reset logo source to arch.png in fastfetch config
+	local config_file="$FASTFETCH_DIR/config.jsonc"
+	if [[ -f "$config_file" ]]; then
+		if grep -q '"source":' "$config_file"; then
+			sed -i 's|"source": "[^"]*"|"source": "~/.config/fastfetch/pngs/arch.png"|g' "$config_file"
+			log_success "Reset logo source to arch.png in fastfetch config"
+		fi
+	fi
+
+	log_success "Uninstall completed!"
+}
+
+handle_on() {
+	log_info "Enabling fastfetch dynamic logo..."
+	update_config
+	log_success "Fastfetch dynamic logo enabled!"
+}
+
+handle_off() {
+	log_info "Disabling fastfetch dynamic logo..."
+
+	local config_file="$FASTFETCH_DIR/config.jsonc"
+	if [[ -f "$config_file" ]]; then
+		# Reset logo source to arch.png
+		if grep -q '"source":' "$config_file"; then
+			sed -i 's|"source": "[^"]*"|"source": "~/.config/fastfetch/pngs/arch.png"|g' "$config_file"
+			log_success "Reset logo source to arch.png in fastfetch config"
+		else
+			log_warning "No logo source found in config"
+		fi
+	else
+		log_warning "No fastfetch config found"
+	fi
+}
+
 # Main setup
 main() {
-	log_info "Starting fastfetch dynamic logo setup..."
+	case "$ACTION" in
+	uninstall)
+		handle_uninstall
+		;;
+	on)
+		check_scripts
+		check_dependencies
+		handle_on
+		;;
+	off)
+		check_scripts
+		handle_off
+		;;
+	install | *)
+		log_info "Starting fastfetch dynamic logo setup..."
+		check_scripts
+		check_dependencies
+		update_config
+		update_zshrc
+		test_setup
 
-	check_scripts
-	check_dependencies
-	update_config
-	update_zshrc
-	test_setup
-
-	echo ""
-	log_success "Setup completed!"
-	echo ""
-	log_info "Usage:"
-	echo "  1. Reload your shell: source ~/.zshrc"
-	echo "  2. Run: fastfetch"
-	echo ""
-	log_info "The fastfetch command will now use dynamic logo generation"
-	log_info "based on your current matugen color scheme."
+		echo ""
+		log_success "Setup completed!"
+		echo ""
+		log_info "Usage:"
+		echo "  1. Reload your shell: source ~/.zshrc"
+		echo "  2. Run: fastfetch"
+		echo ""
+		log_info "The fastfetch command will now use dynamic logo generation"
+		log_info "based on your current matugen color scheme."
+		;;
+	esac
 }
 
 # Run main function

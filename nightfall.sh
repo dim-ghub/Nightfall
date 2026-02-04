@@ -483,6 +483,12 @@ toggle_plugin() {
 			}
 			{ print }
 		' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+
+		# Run setup script with --off flag if available
+		local setup_script="$plugin_dir/setup.sh"
+		if [[ -f "$setup_script" ]]; then
+			bash "$setup_script" --off 2>/dev/null || true
+		fi
 	else
 		# Turn on: uncomment the block
 		awk -v template="[templates.$template_name]" '
@@ -502,6 +508,12 @@ toggle_plugin() {
 			}
 			{ print }
 		' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+
+		# Run setup script with --on flag if available
+		local setup_script="$plugin_dir/setup.sh"
+		if [[ -f "$setup_script" ]]; then
+			bash "$setup_script" --on 2>/dev/null || true
+		fi
 	fi
 
 	# Execute theme refresh silently
@@ -587,6 +599,11 @@ uninstall_plugin() {
 				fi
 			fi
 		done
+	fi
+
+	# Call setup.sh with --uninstall if available
+	if [[ -f "$plugin_dir/setup.sh" ]]; then
+		bash "$plugin_dir/setup.sh" --uninstall
 	fi
 
 	# Execute theme refresh
