@@ -426,20 +426,15 @@ get_plugin_toggle_status() {
 	local matugen_config="$HOME_CONFIG/matugen/config.toml"
 	local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
 
-	# Check if plugin has matugen config
-	if [[ ! -f "$matugen_plugin_config" ]]; then
-		return 1 # No toggle available
-	fi
+	# Quick check if plugin has matugen config
+	[[ ! -f "$matugen_plugin_config" ]] && return 1
 
-	# Read template name from plugin config
+	# Extract template name more efficiently
 	local template_name
-	template_name=$(grep -oE '\[templates\.[^]]+\]' "$matugen_plugin_config" 2>/dev/null | sed 's/\[templates\.//g' | sed 's/\]//g')
+	template_name=$(grep -m1 '^\[templates\.' "$matugen_plugin_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
+	[[ -z "$template_name" ]] && return 1
 
-	if [[ -z "$template_name" ]]; then
-		return 1 # No template name found
-	fi
-
-	# Check if plugin is currently enabled (not commented out)
+	# Simple grep check for enabled status
 	if grep -q "^\[templates\.$template_name\]" "$matugen_config" 2>/dev/null; then
 		echo "ON"
 	else
@@ -705,16 +700,23 @@ draw_ui() {
 			display="${C_WHITE}${title}${C_RESET}"
 		fi
 
-		# Add toggle status indicator for plugins with matugen config
-		# local toggle_status
-		# toggle_status=$(get_plugin_toggle_status "$item" 2>/dev/null)
-		# if [[ -n "$toggle_status" ]]; then
-		# 	if [[ "$toggle_status" == "ON" ]]; then
-		# 		display+=" ${C_GREEN}[ON]${C_RESET}"
-		# 	else
-		# 		display+=" ${C_RED}[OFF]${C_RESET}"
-		# 	fi
-		# fi
+		# Add toggle status for plugins with matugen configs
+		local plugin_dir="$NIGHTFALL_DIR/plugins/$item"
+		local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
+
+		if [[ -f "$matugen_plugin_config" ]]; then
+			# Extract template name
+			local template_name
+			template_name=$(grep -m1 '^\[templates\.' "$matugen_plugin_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
+
+			if [[ -n "$template_name" ]]; then
+				if grep -q "^\[templates\.$template_name\]" "$HOME_CONFIG/matugen/config.toml" 2>/dev/null; then
+					display+=" ${C_GREEN}[ON]${C_RESET}"
+				else
+					display+=" ${C_RED}[OFF]${C_RESET}"
+				fi
+			fi
+		fi
 
 		printf -v padded_item "%-${ITEM_PADDING}s" "${title:0:$ITEM_PADDING}"
 
