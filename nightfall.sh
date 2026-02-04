@@ -22,7 +22,8 @@ export LC_NUMERIC=C
 readonly NIGHTFALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly HOME_CONFIG="$HOME/.config"
 readonly APP_TITLE="Nightfall Plugin Manager"
-readonly APP_VERSION="v1.1"
+readonly APP_VERSION="v1.3"
+readonly PLUGIN_CACHE_FILE="$HOME/.cache/nightfall_installed_plugins.txt"
 
 # Dimensions & Layout
 declare -ri MAX_DISPLAY_ROWS=12 # Rows of items to show before scrolling
@@ -93,6 +94,144 @@ log_warn() {
 	printf '%s[WARN]%s %s\n' "$C_MAGENTA" "$C_RESET" "$1" >&2
 }
 
+# --- Cache Functions ---
+
+read_plugin_cache() {
+	if [[ ! -f "$PLUGIN_CACHE_FILE" ]]; then
+		return 1
+	fi
+
+	local cache_version
+	cache_version=$(head -n1 "$PLUGIN_CACHE_FILE" 2>/dev/null || echo "invalid")
+	if [[ "$cache_version" != "nightfall_v1" ]]; then
+		return 1
+	fi
+
+	local cached_plugins
+	cached_plugins=$(tail -n +2 "$PLUGIN_CACHE_FILE" 2>/dev/null || echo "")
+	if [[ -z "$cached_plugins" ]]; then
+		return 1
+	fi
+
+	# Return only non-empty lines
+	echo "$cached_plugins" | grep -v '^$'
+	return 0
+}
+
+write_plugin_cache() {
+	local installed_plugins="$1"
+
+	mkdir -p "$(dirname "$PLUGIN_CACHE_FILE")"
+	cat >"$PLUGIN_CACHE_FILE" <<EOF
+nightfall_v1
+$installed_plugins
+EOF
+}
+
+is_plugin_cached_installed() {
+	local plugin_name="$1"
+	local cache_output
+	cache_output=$(read_plugin_cache) || return 1
+
+	echo "$cache_output" | grep -q "^$plugin_name$"
+}
+
+add_plugin_to_cache() {
+	local plugin_name="$1"
+	local cache_output
+	cache_output=$(read_plugin_cache) || cache_output=""
+
+	# Check if plugin is already in cache
+	if echo "$cache_output" | grep -q "^$plugin_name$"; then
+		return 0
+	fi
+
+	# Add plugin to cache, ensuring no duplicates
+	local temp_file="${PLUGIN_CACHE_FILE}.tmp"
+	{
+		echo "nightfall_v1"
+		echo "$cache_output"
+		echo "$plugin_name"
+	} | grep -v '^$' | sort -u >"$temp_file" && mv "$temp_file" "$PLUGIN_CACHE_FILE"
+}
+
+remove_plugin_from_cache() {
+	local plugin_name="$1"
+	local cache_output
+	cache_output=$(read_plugin_cache) || return 1
+
+	echo "$cache_output" | grep -v "^$plugin_name$" >"$PLUGIN_CACHE_FILE.tmp"
+	write_plugin_cache "$(cat "$PLUGIN_CACHE_FILE.tmp")"
+	rm -f "$PLUGIN_CACHE_FILE.tmp"
+}
+
+clear_plugin_cache() {
+	rm -f "$PLUGIN_CACHE_FILE"
+}
+
+validate_cache() {
+	local cache_output
+	cache_output=$(read_plugin_cache) || return 1
+
+	local valid_plugins=""
+	local needs_update=false
+
+	# Check each cached plugin if it's still actually installed
+	while IFS= read -r plugin_name; do
+		if [[ -n "$plugin_name" ]]; then
+			local plugin_dir="$NIGHTFALL_DIR/$plugin_name"
+			local config_dir="$plugin_dir/.config"
+
+			if [[ -d "$config_dir" ]]; then
+				local still_installed=true
+				for item in "$config_dir"/*; do
+					local item_name
+					item_name=$(basename "$item")
+					if [[ "$item_name" == "matugen" && -d "$item" ]]; then
+						# Check matugen config.toml content
+						local plugin_config="$item/config.toml"
+						local user_config="$HOME_CONFIG/matugen/config.toml"
+						if [[ -f "$plugin_config" && -f "$user_config" ]]; then
+							if ! grep -qF "$(cat "$plugin_config")" "$user_config"; then
+								still_installed=false
+								break
+							fi
+						else
+							still_installed=false
+							break
+						fi
+					elif [[ -d "$item" ]]; then
+						local target_dir="$HOME_CONFIG/$item_name"
+						if [[ ! -d "$target_dir" ]]; then
+							still_installed=false
+							break
+						fi
+					elif [[ -f "$item" ]]; then
+						local target_file="$HOME_CONFIG/$item_name"
+						if [[ ! -f "$target_file" ]]; then
+							still_installed=false
+							break
+						fi
+					fi
+				done
+
+				if [[ "$still_installed" == "true" ]]; then
+					valid_plugins+="${valid_plugins:+$'\n'}$plugin_name"
+				else
+					needs_update=true
+				fi
+			else
+				needs_update=true
+			fi
+		fi
+	done <<<"$cache_output"
+
+	# Update cache if validation found issues
+	if [[ "$needs_update" == "true" ]]; then
+		write_plugin_cache "$valid_plugins"
+	fi
+}
+
 cleanup() {
 	# Restore terminal state (Mouse, Cursor, Colors)
 	printf '%s%s%s' "$MOUSE_OFF" "$CURSOR_SHOW" "$C_RESET"
@@ -116,6 +255,9 @@ get_available_plugins() {
 	TAB_ITEMS_0=()
 	TAB_ITEMS_1=()
 
+	# Validate cache to detect manually removed plugins
+	validate_cache
+
 	for dir in "$NIGHTFALL_DIR"/*/; do
 		if [[ -d "$dir" && -f "${dir}info" && "$(basename "$dir")" != "arch_iso_scripts" ]]; then
 			local plugin_name
@@ -134,41 +276,61 @@ get_available_plugins() {
 		fi
 	done
 
-	# Check installed status
+	# Check installed status using cache first
 	for plugin in "${AVAILABLE_PLUGINS[@]}"; do
 		local plugin_dir="$NIGHTFALL_DIR/$plugin"
 		local config_dir="$plugin_dir/.config"
 
 		if [[ -d "$config_dir" ]]; then
-			local is_installed=true
-			for item in "$config_dir"/*; do
-				local item_name
-				item_name=$(basename "$item")
-				if [[ "$item_name" == "matugen" && -d "$item" ]]; then
-					# Check matugen config.toml content
-					local plugin_config="$item/config.toml"
-					local user_config="$HOME_CONFIG/matugen/config.toml"
-					if [[ -f "$plugin_config" && -f "$user_config" ]]; then
-						if ! grep -qF "$(cat "$plugin_config")" "$user_config"; then
-							is_installed=false
+			local is_installed=false
+
+			# Check cache first
+			if is_plugin_cached_installed "$plugin"; then
+				is_installed=true
+			else
+				# Fallback to filesystem check if cache miss
+				local filesystem_check=true
+				for item in "$config_dir"/*; do
+					local item_name
+					item_name=$(basename "$item")
+					if [[ "$item_name" == "matugen" && -d "$item" ]]; then
+						# Check matugen config.toml content
+						local plugin_config="$item/config.toml"
+						local user_config="$HOME_CONFIG/matugen/config.toml"
+						if [[ -f "$plugin_config" && -f "$user_config" ]]; then
+							if ! grep -qF "$(cat "$plugin_config")" "$user_config"; then
+								filesystem_check=false
+								break
+							fi
+						else
+							filesystem_check=false
 							break
 						fi
-					else
-						is_installed=false
-						break
+					elif [[ -d "$item" ]]; then
+						local target_dir="$HOME_CONFIG/$item_name"
+						if [[ ! -d "$target_dir" ]]; then
+							filesystem_check=false
+							break
+						fi
+					elif [[ -f "$item" ]]; then
+						local target_file="$HOME_CONFIG/$item_name"
+						if [[ ! -f "$target_file" ]]; then
+							filesystem_check=false
+							break
+						fi
 					fi
-				elif [[ -d "$item" ]]; then
-					local target_dir="$HOME_CONFIG/$item_name"
-					if [[ ! -d "$target_dir" ]]; then
-						is_installed=false
-						break
-					fi
+				done
+
+				if [[ "$filesystem_check" == "true" ]]; then
+					is_installed=true
+					# Update cache with filesystem verification result
+					add_plugin_to_cache "$plugin"
 				fi
-			done
+			fi
 
 			if [[ "$is_installed" == "true" ]]; then
-				PLUGIN_INFO["$plugin_name"]=$(echo "${PLUGIN_INFO[$plugin_name]}" | sed 's/|false$/|true/')
-				TAB_ITEMS_1+=("$plugin_name")
+				PLUGIN_INFO["$plugin"]=$(echo "${PLUGIN_INFO[$plugin]}" | sed 's/|false$/|true/')
+				TAB_ITEMS_1+=("$plugin")
 			fi
 		fi
 	done
@@ -277,21 +439,21 @@ install_plugin() {
 
 	read -p "Press Enter to continue..." -r
 
-	# Update plugin info
-	get_available_plugins
+	# Update cache instead of refreshing all plugins
+	add_plugin_to_cache "$plugin_name"
 }
 
 handle_matugen_config() {
 	local matugen_dir="$1"
 
-	# Handle config.toml (append if exists)
+	# Handle config.toml with smart merging
 	local config_file="$matugen_dir/config.toml"
 	local target_config="$HOME_CONFIG/matugen/config.toml"
 
 	if [[ -f "$config_file" ]]; then
-		echo -e "  ${C_GREEN}✓${C_RESET} Appending matugen config.toml"
+		echo -e "  ${C_GREEN}✓${C_RESET} Merging matugen config.toml"
 		mkdir -p "$(dirname "$target_config")"
-		cat "$config_file" >>"$target_config"
+		smart_merge_matugen_config "$config_file" "$target_config"
 	fi
 
 	# Handle templates folder (copy if exists)
@@ -300,6 +462,111 @@ handle_matugen_config() {
 		echo -e "  ${C_GREEN}✓${C_RESET} Copying matugen templates"
 		mkdir -p "$HOME_CONFIG/matugen/templates"
 		cp -r "$templates_dir"/* "$HOME_CONFIG/matugen/templates/"
+	fi
+}
+
+smart_merge_matugen_config() {
+	local plugin_config="$1"
+	local target_config="$2"
+
+	# Read the plugin config content
+	local plugin_content
+	plugin_content=$(cat "$plugin_config")
+
+	# Extract the section title (first line that starts with [)
+	local plugin_title
+	plugin_title=$(echo "$plugin_content" | grep '^\[' | head -n1)
+
+	# If no title found, just append normally
+	if [[ -z "$plugin_title" ]]; then
+		echo "$plugin_content" >>"$target_config"
+		return 0
+	fi
+
+	# Check if target config exists and has the same section
+	if [[ -f "$target_config" ]]; then
+		# Check if the exact same content already exists
+		# Extract existing section including the title
+		local existing_section
+		existing_section=$(awk -v section="$plugin_title" '
+			BEGIN { found=0 }
+			$0 == section { found=1; print; next }
+			found && /^\[/ { exit }
+			found { print }
+		' "$target_config")
+
+		# Normalize both for comparison (remove leading/trailing whitespace)
+		local plugin_clean existing_clean
+		plugin_clean=$(echo "$plugin_content" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+		existing_clean=$(echo "$existing_section" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+
+		if [[ "$plugin_clean" == "$existing_clean" ]]; then
+			echo -e "    ${C_GREY}✓${C_RESET} Config already exists, skipping"
+			return 0
+		fi
+
+		# Create temp file for the new config
+		local temp_config
+		temp_config=$(mktemp)
+
+		# Read target config line by line
+		local in_section=false
+		local found_section=false
+		local line_before_empty=false
+
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			# Check if this is the start of the section we need to comment out
+			if [[ "$line" == "$plugin_title" ]]; then
+				in_section=true
+				found_section=true
+				# Comment out this line
+				echo "# $line" >>"$temp_config"
+				continue
+			fi
+
+			# If we're in the section, check if we've reached the next section
+			if [[ "$in_section" == "true" ]]; then
+				# If we hit a new section title, stop commenting
+				if [[ "$line" =~ ^\[.*\]$ ]]; then
+					in_section=false
+					# Comment out the empty line before if it was empty
+					if [[ "$line_before_empty" == "true" ]]; then
+						echo "# " >>"$temp_config"
+					fi
+					echo "$line" >>"$temp_config"
+				else
+					# Comment out the line in the section
+					echo "# $line" >>"$temp_config"
+				fi
+			else
+				# Not in the section, copy as-is
+				echo "$line" >>"$temp_config"
+			fi
+
+			# Track if the previous line was empty
+			if [[ -z "$line" ]]; then
+				line_before_empty=true
+			else
+				line_before_empty=false
+			fi
+		done <"$target_config"
+
+		# Add the new plugin config at the end
+		echo "" >>"$temp_config"
+		echo "$plugin_content" >>"$temp_config"
+
+		# Replace the target config
+		mv "$temp_config" "$target_config"
+
+		if [[ "$found_section" == "true" ]]; then
+			echo -e "    ${C_YELLOW}✓${C_RESET} Commented out existing section and added new config"
+		else
+			echo -e "    ${C_GREY}✓${C_RESET} Added new config section"
+		fi
+	else
+		# Target doesn't exist, just copy the plugin config
+		echo "$plugin_content" >"$target_config"
+		echo -e "    ${C_GREY}✓${C_RESET} Created new config file"
 	fi
 }
 
@@ -564,6 +831,21 @@ handle_mouse() {
 # --- Main ---
 
 main() {
+	# Handle command line arguments
+	case "${1:-}" in
+	--clear-cache)
+		clear_plugin_cache
+		echo "Plugin cache cleared."
+		exit 0
+		;;
+	--help | -h)
+		echo "Usage: $0 [--clear-cache] [--help]"
+		echo "  --clear-cache  Clear the plugin installation cache"
+		echo "  --help, -h     Show this help message"
+		exit 0
+		;;
+	esac
+
 	# 1. Config Validation
 	if [[ ! -d "$NIGHTFALL_DIR" ]]; then
 		log_err "Nightfall directory not found: $NIGHTFALL_DIR"
