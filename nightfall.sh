@@ -420,6 +420,33 @@ install_plugin() {
 	read -p "Press Enter to continue..." -r
 }
 
+get_plugin_toggle_status() {
+	local plugin_name="$1"
+	local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
+	local matugen_config="$HOME_CONFIG/matugen/config.toml"
+	local matugen_plugin_config="$plugin_dir/.config/matugen/config.toml"
+
+	# Check if plugin has matugen config
+	if [[ ! -f "$matugen_plugin_config" ]]; then
+		return 1 # No toggle available
+	fi
+
+	# Read template name from plugin config
+	local template_name
+	template_name=$(grep -oE '\[templates\.[^]]+\]' "$matugen_plugin_config" 2>/dev/null | sed 's/\[templates\.//g' | sed 's/\]//g')
+
+	if [[ -z "$template_name" ]]; then
+		return 1 # No template name found
+	fi
+
+	# Check if plugin is currently enabled (not commented out)
+	if grep -q "^\[templates\.$template_name\]" "$matugen_config" 2>/dev/null; then
+		echo "ON"
+	else
+		echo "OFF"
+	fi
+}
+
 handle_matugen_config() {
 	local matugen_dir="$1"
 
@@ -678,19 +705,30 @@ draw_ui() {
 			display="${C_WHITE}${title}${C_RESET}"
 		fi
 
+		# Add toggle status indicator for plugins with matugen config
+		# local toggle_status
+		# toggle_status=$(get_plugin_toggle_status "$item" 2>/dev/null)
+		# if [[ -n "$toggle_status" ]]; then
+		# 	if [[ "$toggle_status" == "ON" ]]; then
+		# 		display+=" ${C_GREEN}[ON]${C_RESET}"
+		# 	else
+		# 		display+=" ${C_RED}[OFF]${C_RESET}"
+		# 	fi
+		# fi
+
 		printf -v padded_item "%-${ITEM_PADDING}s" "${title:0:$ITEM_PADDING}"
 
 		if ((i == SELECTED_ROW)); then
 			if ((CURRENT_TAB == 0)); then
 				buf+="${C_CYAN} ➤ ${C_INVERSE}${padded_item}${C_RESET} : ${display}${CLR_EOL}"$'\n'
 			else
-				buf+="${C_CYAN} ➤ ${C_INVERSE}${padded_item}${C_RESET}${CLR_EOL}"$'\n'
+				buf+="${C_CYAN} ➤ ${C_INVERSE}${padded_item}${C_RESET} : ${display}${CLR_EOL}"$'\n'
 			fi
 		else
 			if ((CURRENT_TAB == 0)); then
 				buf+="    ${padded_item} : ${display}${CLR_EOL}"$'\n'
 			else
-				buf+="    ${padded_item}${CLR_EOL}"$'\n'
+				buf+="    ${padded_item} : ${display}${CLR_EOL}"$'\n'
 			fi
 		fi
 	done
@@ -881,6 +919,20 @@ main() {
 			'[Z') switch_tab -1 ;;      # Shift+Tab
 			'[A' | 'OA') navigate -1 ;; # Arrow Up
 			'[B' | 'OB') navigate 1 ;;  # Arrow Down
+			'[C' | 'OC')                # Arrow Right - toggle plugin
+				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
+					toggle_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
+				elif ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
+					toggle_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
+				fi
+				;;
+			'[D' | 'OD') # Arrow Left - toggle plugin
+				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
+					toggle_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
+				elif ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
+					toggle_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
+				fi
+				;;
 			'[<'* | '['*'<'*) handle_mouse "$seq" ;;
 			esac
 		else
