@@ -54,7 +54,7 @@ apply_theme() {
 	fi
 
 	log_info "Setting Spicetify theme to text..."
-	spicetify config theme text
+	spicetify config current_theme text
 
 	log_info "Setting color scheme to matugen..."
 	spicetify config color_scheme matugen
@@ -72,7 +72,7 @@ reset_theme() {
 	fi
 
 	log_info "Resetting Spicetify theme to default..."
-	spicetify config theme ""
+	spicetify config current_theme ""
 	spicetify config color_scheme ""
 	spicetify apply
 
@@ -88,7 +88,7 @@ complete_reset() {
 	log_info "Performing complete Spicetify reset..."
 
 	# Reset theme and color scheme
-	spicetify config theme ""
+	spicetify config current_theme ""
 	spicetify config color_scheme ""
 
 	# Clear spicetify cache
