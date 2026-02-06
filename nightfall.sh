@@ -859,11 +859,49 @@ draw_ui() {
 		IFS='|' read -r title description installed <<<"$plugin_info"
 
 		if ((CURRENT_TAB == 0)); then
-			# Plugins tab - show status
+			# Plugins tab - show status with conflict detection
 			if [[ "$installed" == "true" ]]; then
 				display="${C_GREEN}Installed${C_RESET}"
 			else
-				display="${C_GREY}Available${C_RESET}"
+				# Check for conflicts with spice plugins
+				if [[ "$item" == "spicetext" ]]; then
+					local spicedim_status
+					spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
+					if [[ "$spicedim_status" == "ON" ]]; then
+						display="${C_RED}Disabled (spicedim active)${C_RESET}"
+					else
+						display="${C_GREY}Available${C_RESET}"
+					fi
+				elif [[ "$item" == "spicedim" ]]; then
+					local spicetext_status
+					spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
+					if [[ "$spicetext_status" == "ON" ]]; then
+						display="${C_RED}Disabled (spicetext active)${C_RESET}"
+					else
+						display="${C_GREY}Available${C_RESET}"
+					fi
+				# Check for conflicts with fox plugins
+				elif [[ "$item" == "textfox" ]]; then
+					local dimfox_info="${PLUGIN_INFO[dimfox]}"
+					local dimfox_installed
+					dimfox_installed=$(echo "$dimfox_info" | cut -d'|' -f3)
+					if [[ "$dimfox_installed" == "true" ]]; then
+						display="${C_GREY}Available${C_RESET}"
+					else
+						display="${C_GREY}Available${C_RESET}"
+					fi
+				elif [[ "$item" == "dimfox" ]]; then
+					local textfox_info="${PLUGIN_INFO[textfox]}"
+					local textfox_installed
+					textfox_installed=$(echo "$textfox_info" | cut -d'|' -f3)
+					if [[ "$textfox_installed" == "true" ]]; then
+						display="${C_GREY}Available${C_RESET}"
+					else
+						display="${C_GREY}Available${C_RESET}"
+					fi
+				else
+					display="${C_GREY}Available${C_RESET}"
+				fi
 			fi
 		else
 			# Installed tab - show description
