@@ -34,7 +34,7 @@ Or launch it from your application menu as "Nightfall Manager".
 
 ### Adding Plugins
 
-1. Create a new directory in the root folder (e.g., `my-plugin/`)
+1. Create a new directory in the `plugins/` folder (e.g., `plugins/my-plugin/`)
 2. Add an `info` file with the following format:
    ```
    # Plugin Title
@@ -43,19 +43,20 @@ Or launch it from your application menu as "Nightfall Manager".
    ```
 3. Add configuration files in a `.config/` subdirectory
 4. Optional: Add a `setup.sh` script for additional installation steps
+5. Optional: Add preview images in a `previews/` subdirectory
 
 ### Plugin Structure
 
 ```
-my-plugin/
-├── info                    # Plugin information
-├── .config/               # Configuration files
-│   ├── app1/             # App configurations
-│   ├── matugen/          # Matugen-specific config
-│   │   ├── config.toml   # Gets appended to ~/.config/matugen/config.toml
-│   │   └── templates/    # Gets copied to ~/.config/matugen/templates/
-│   └── app2/
-└── setup.sh              # Optional setup script
+plugins/my-plugin/
+├── info              # Plugin info file (title, description)
+├── setup.sh          # Optional: Installation script with --install, --uninstall, --on, --off flags
+├── .config/          # Config files to install
+│   ├── app1/         # App-specific configs
+│   └── matugen/      # Matugen templates and config
+│       ├── config.toml
+│       └── templates/
+└── previews/         # Preview images (ignored by installer)
 ```
 
 The TUI will automatically handle the installation of configuration files based on this structure.
@@ -63,41 +64,36 @@ The TUI will automatically handle the installation of configuration files based 
 ## Available Plugins
 
 ### dimfox
-Firefox theme customization that installs the textfox-rounded theme with rounded corners and no segment labels for a cleaner browsing experience.
-
-<!-- ![dimfox preview](images/dimfox.png) -->
+A Firefox theme customization that installs the textfox-rounded theme with rounded corners and no segment labels for a cleaner browsing experience.
 
 ### textfox
-Firefox theme customization that installs the textfox theme with segment labels and standard corners for a detailed Firefox browsing experience.
-
-<!-- ![textfox preview](images/textfox.png) -->
+A Firefox theme customization that installs the textfox theme with segment labels and standard corners for a detailed Firefox browsing experience.
 
 ### spicedim
-Spicetify theme configuration that sets the "dim" theme with rounded corners, no segment labels, and matugen-generated colors for a cleaner Spotify interface.
-
-<!-- ![spicedim preview](images/spicedim.png) -->
+A Spicetify theme configuration that sets the "dim" theme with rounded corners, no segment labels, and matugen-generated colors for a cleaner Spotify interface.
 
 ### spicetext
-Spicetify theme configuration that sets the "text" theme with segment labels and matugen-generated colors for a detailed Spotify interface.
-
-<!-- ![spicetext preview](images/spicetext.png) -->
+A Spicetify theme configuration that sets the "text" theme with segment labels and matugen-generated colors for a detailed Spotify interface.
 
 ### steamatugen
 Desktop Steam theming setup with Decky Loader integration and matugen color theming for a customized Steam client experience.
 
-<!-- ![steamatugen preview](images/steamatugen.png) -->
-
 ### waybar-tui
 Waybar configuration manager that switches to TUI style configuration by removing existing symlinks and creating new symlinks to the TUI config files, then restarts waybar to apply changes.
-
-<!-- ![waybar-tui preview](images/waybar-tui.png) -->
 
 ### discordsys24
 Discord theme based on system24 with Catppuccin mocha colors that provides a TUI-style Discord interface with matugen integration for dynamic theming.
 
-<!-- ![discordsys24 preview](images/discordsys24.png) -->
-
 ### matugenfetch
 A script that gets executed automatically by fastfetch to color the Arch logo with accents from your wallpaper.
 
-<!-- ![matugenfetch preview](images/matugenfetch.png) -->
+### obsmatugen
+OBS Studio theme integration with matugen color generation for Catppuccin-themed recording overlays and UI elements. This plugin provides the Catppuccin color scheme that automatically adapts to your system colors, creating a cohesive dark theme for your recording setup.
+
+Features:
+- Catppuccin color scheme for OBS Studio
+- Automatic color generation with matugen integration
+- Dark theme optimized for recording overlays
+- UI element theming for professional streaming setup
+
+Note: Manual setup required in OBS Studio settings to enable theme.
