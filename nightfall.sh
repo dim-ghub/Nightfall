@@ -483,6 +483,21 @@ toggle_plugin() {
 			bash "$setup_script" --off 2>/dev/null || true
 		fi
 	else
+		# Turn on: First check if we need to turn off the other spice variant
+		if [[ "$plugin_name" == "spicetext" ]]; then
+			local spicedim_status
+			spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
+			if [[ "$spicedim_status" == "ON" ]]; then
+				toggle_plugin "spicedim"
+			fi
+		elif [[ "$plugin_name" == "spicedim" ]]; then
+			local spicetext_status
+			spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
+			if [[ "$spicetext_status" == "ON" ]]; then
+				toggle_plugin "spicetext"
+			fi
+		fi
+
 		# Turn on: uncomment the block
 		local temp_config
 		temp_config=$(mktemp) || {
