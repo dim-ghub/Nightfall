@@ -488,13 +488,67 @@ toggle_plugin() {
 			local spicedim_status
 			spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
 			if [[ "$spicedim_status" == "ON" ]]; then
-				toggle_plugin "spicedim"
+				# Directly turn off spicedim without recursion
+				local spicedim_dir="$NIGHTFALL_DIR/plugins/spicedim"
+				local spicedim_template="spicedim"
+				local temp_config_off
+				temp_config_off=$(mktemp)
+				if awk -v template="[templates.$spicedim_template]" '
+					$0 == template {
+						print "#" $0
+						in_block=1
+						next
+					}
+					in_block && /^\[.*\]/ {
+						in_block=0
+						print
+						next
+					}
+					in_block {
+						print "#" $0
+						next
+					}
+					{ print }
+				' "$matugen_config" >"$temp_config_off"; then
+					mv "$temp_config_off" "$matugen_config"
+				fi
+				# Run spicedim setup script --off
+				if [[ -f "$spicedim_dir/setup.sh" ]]; then
+					bash "$spicedim_dir/setup.sh" --off 2>/dev/null || true
+				fi
 			fi
 		elif [[ "$plugin_name" == "spicedim" ]]; then
 			local spicetext_status
 			spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
 			if [[ "$spicetext_status" == "ON" ]]; then
-				toggle_plugin "spicetext"
+				# Directly turn off spicetext without recursion
+				local spicetext_dir="$NIGHTFALL_DIR/plugins/spicetext"
+				local spicetext_template="spicetext"
+				local temp_config_off
+				temp_config_off=$(mktemp)
+				if awk -v template="[templates.$spicetext_template]" '
+					$0 == template {
+						print "#" $0
+						in_block=1
+						next
+					}
+					in_block && /^\[.*\]/ {
+						in_block=0
+						print
+						next
+					}
+					in_block {
+						print "#" $0
+						next
+					}
+					{ print }
+				' "$matugen_config" >"$temp_config_off"; then
+					mv "$temp_config_off" "$matugen_config"
+				fi
+				# Run spicetext setup script --off
+				if [[ -f "$spicetext_dir/setup.sh" ]]; then
+					bash "$spicetext_dir/setup.sh" --off 2>/dev/null || true
+				fi
 			fi
 		fi
 
