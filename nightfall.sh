@@ -302,6 +302,33 @@ install_plugin() {
 		return 1
 	fi
 
+	# Handle variant conflicts for spice plugins
+	if [[ "$plugin_name" == "spicetext" ]]; then
+		local spicedim_info="${PLUGIN_INFO[spicedim]}"
+		local spicedim_installed
+		spicedim_installed=$(echo "$spicedim_info" | cut -d'|' -f3)
+		if [[ "$spicedim_installed" == "true" ]]; then
+			local spicedim_status
+			spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
+			if [[ "$spicedim_status" == "ON" ]]; then
+				printf '%bTurning off spicedim variant...%b\n' "$C_BLUE" "$C_RESET"
+				toggle_plugin "spicedim"
+			fi
+		fi
+	elif [[ "$plugin_name" == "spicedim" ]]; then
+		local spicetext_info="${PLUGIN_INFO[spicetext]}"
+		local spicetext_installed
+		spicetext_installed=$(echo "$spicetext_info" | cut -d'|' -f3)
+		if [[ "$spicetext_installed" == "true" ]]; then
+			local spicetext_status
+			spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
+			if [[ "$spicetext_status" == "ON" ]]; then
+				printf '%bTurning off spicetext variant...%b\n' "$C_BLUE" "$C_RESET"
+				toggle_plugin "spicetext"
+			fi
+		fi
+	fi
+
 	printf '%bInstalling configuration files...%b\n' "$C_BLUE" "$C_RESET"
 
 	# Install .config contents
@@ -910,23 +937,9 @@ draw_ui() {
 			if [[ "$installed" == "true" ]]; then
 				display="${C_GREEN}Installed${C_RESET}"
 			else
-				# Check for conflicts with spice plugins
-				if [[ "$item" == "spicetext" ]]; then
-					local spicedim_status
-					spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
-					if [[ "$spicedim_status" == "ON" ]]; then
-						display="${C_RED}Disabled (spicedim active)${C_RESET}"
-					else
-						display="${C_GREY}Available${C_RESET}"
-					fi
-				elif [[ "$item" == "spicedim" ]]; then
-					local spicetext_status
-					spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
-					if [[ "$spicetext_status" == "ON" ]]; then
-						display="${C_RED}Disabled (spicetext active)${C_RESET}"
-					else
-						display="${C_GREY}Available${C_RESET}"
-					fi
+				# Check for conflicts with spice plugins - show Available regardless of variant status
+				if [[ "$item" == "spicetext" ]] || [[ "$item" == "spicedim" ]]; then
+					display="${C_GREY}Available${C_RESET}"
 				# Check for conflicts with fox plugins
 				elif [[ "$item" == "textfox" ]]; then
 					local dimfox_info="${PLUGIN_INFO[dimfox]}"
