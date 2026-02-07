@@ -75,7 +75,8 @@ declare -a TAB_ZONES=()
 declare ORIGINAL_STTY=""
 
 # --- Data Structures ---
-declare -A PLUGIN_INFO # plugin_name -> "title|description|installed"
+declare -A PLUGIN_INFO     # plugin_name -> "title|description|installed"
+declare -A PLUGIN_VARIANTS # plugin_name -> "variant_plugin_name"
 declare -a AVAILABLE_PLUGINS=() INSTALLED_PLUGINS=()
 
 # Provisioned Tab Containers (0-9) to avoid sparse array errors
@@ -153,6 +154,29 @@ add_plugin_to_cache() {
 		echo "$cache_output"
 		echo "$plugin_name"
 	} | grep -v '^$' | tail -n +2 | sort -u | awk 'BEGIN{print "nightfall_v1"} {print}' >"$temp_file" && mv "$temp_file" "$PLUGIN_CACHE_FILE"
+
+	# Handle variant plugin cache updates
+	local variant_plugin="${PLUGIN_VARIANTS[$plugin_name]:-}"
+	if [[ -n "$variant_plugin" ]]; then
+		# Check if variant plugin is installed and supports toggling
+		local variant_info="${PLUGIN_INFO[$variant_plugin]:-}"
+		local variant_installed
+		variant_installed=$(echo "$variant_info" | cut -d'|' -f3)
+		if [[ "$variant_installed" == "true" ]]; then
+			local variant_dir="$NIGHTFALL_DIR/plugins/$variant_plugin"
+			local variant_matugen_config="$variant_dir/.config/matugen/config.toml"
+			if [[ -f "$variant_matugen_config" ]]; then
+				# Variant supports toggling, update its status in cache
+				local variant_status
+				variant_status=$(get_plugin_toggle_status "$variant_plugin" 2>/dev/null || echo "OFF")
+				if [[ "$variant_status" == "OFF" ]]; then
+					# Variant is now OFF, ensure it's still in cache but marked as OFF
+					# Cache already contains it, status will be shown in UI
+					:
+				fi
+			fi
+		fi
+	fi
 }
 
 remove_plugin_from_cache() {
@@ -226,10 +250,14 @@ get_available_plugins() {
 			# Read plugin info
 			local info_file="$dir/info"
 			if [[ -f "$info_file" ]]; then
-				local title description
+				local title description variant
 				title=$(sed -n '1s/^#\s*//p' "$info_file")
-				description=$(sed -n '3,$p' "$info_file" | tr '\n' ' ')
+				description=$(sed -n '3,$p' "$info_file" | grep -v '^#' | tr '\n' ' ')
+				variant=$(sed -n 's/^#\s*variant\s*=\s*//p' "$info_file" | tr -d ' ')
 				PLUGIN_INFO["$plugin_name"]="$title|$description|false"
+				if [[ -n "$variant" ]]; then
+					PLUGIN_VARIANTS["$plugin_name"]="$variant"
+				fi
 			fi
 		fi
 	done
@@ -302,29 +330,18 @@ install_plugin() {
 		return 1
 	fi
 
-	# Handle variant conflicts for spice plugins
-	if [[ "$plugin_name" == "spicetext" ]]; then
-		local spicedim_info="${PLUGIN_INFO[spicedim]}"
-		local spicedim_installed
-		spicedim_installed=$(echo "$spicedim_info" | cut -d'|' -f3)
-		if [[ "$spicedim_installed" == "true" ]]; then
-			local spicedim_status
-			spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
-			if [[ "$spicedim_status" == "ON" ]]; then
-				printf '%bTurning off spicedim variant...%b\n' "$C_BLUE" "$C_RESET"
-				toggle_plugin "spicedim"
-			fi
-		fi
-	elif [[ "$plugin_name" == "spicedim" ]]; then
-		local spicetext_info="${PLUGIN_INFO[spicetext]}"
-		local spicetext_installed
-		spicetext_installed=$(echo "$spicetext_info" | cut -d'|' -f3)
-		if [[ "$spicetext_installed" == "true" ]]; then
-			local spicetext_status
-			spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
-			if [[ "$spicetext_status" == "ON" ]]; then
-				printf '%bTurning off spicetext variant...%b\n' "$C_BLUE" "$C_RESET"
-				toggle_plugin "spicetext"
+	# Handle variant conflicts using variant information from info files
+	local variant_plugin="${PLUGIN_VARIANTS[$plugin_name]:-}"
+	if [[ -n "$variant_plugin" ]]; then
+		local variant_info="${PLUGIN_INFO[$variant_plugin]:-}"
+		local variant_installed
+		variant_installed=$(echo "$variant_info" | cut -d'|' -f3)
+		if [[ "$variant_installed" == "true" ]]; then
+			local variant_status
+			variant_status=$(get_plugin_toggle_status "$variant_plugin" 2>/dev/null || echo "OFF")
+			if [[ "$variant_status" == "ON" ]]; then
+				printf '%bTurning off %s variant...%b\n' "$C_BLUE" "$variant_plugin" "$C_RESET"
+				toggle_plugin "$variant_plugin"
 			fi
 		fi
 	fi
@@ -483,68 +500,45 @@ toggle_plugin() {
 			bash "$setup_script" --off 2>/dev/null || true
 		fi
 	else
-		# Turn on: First check if we need to turn off the other spice variant
-		if [[ "$plugin_name" == "spicetext" ]]; then
-			local spicedim_status
-			spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
-			if [[ "$spicedim_status" == "ON" ]]; then
-				# Directly turn off spicedim by commenting it out in config
-				local spicedim_template="spicedim"
-				local temp_config_off
-				temp_config_off=$(mktemp)
-				if awk -v template="[templates.$spicedim_template]" '
-					$0 == template {
-						print "#" $0
-						in_block=1
-						next
-					}
-					in_block && /^\[.*\]/ {
-						in_block=0
-						print
-						next
-					}
-					in_block {
-						print "#" $0
-						next
-					}
-					{ print }
-				' "$matugen_config" >"$temp_config_off"; then
-					if mv "$temp_config_off" "$matugen_config"; then
-						temp_config_off=""
-					else
-						rm -f "$temp_config_off"
-					fi
-				fi
-			fi
-		elif [[ "$plugin_name" == "spicedim" ]]; then
-			local spicetext_status
-			spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
-			if [[ "$spicetext_status" == "ON" ]]; then
-				# Directly turn off spicetext by commenting it out in config
-				local spicetext_template="spicetext"
-				local temp_config_off
-				temp_config_off=$(mktemp)
-				if awk -v template="[templates.$spicetext_template]" '
-					$0 == template {
-						print "#" $0
-						in_block=1
-						next
-					}
-					in_block && /^\[.*\]/ {
-						in_block=0
-						print
-						next
-					}
-					in_block {
-						print "#" $0
-						next
-					}
-					{ print }
-				' "$matugen_config" >"$temp_config_off"; then
-					if mv "$temp_config_off" "$matugen_config"; then
-						temp_config_off=""
-					else
-						rm -f "$temp_config_off"
+		# Turn on: First check if we need to turn off the variant plugin
+		local variant_plugin="${PLUGIN_VARIANTS[$plugin_name]:-}"
+		if [[ -n "$variant_plugin" ]]; then
+			local variant_status
+			variant_status=$(get_plugin_toggle_status "$variant_plugin" 2>/dev/null || echo "OFF")
+			if [[ "$variant_status" == "ON" ]]; then
+				# Get variant plugin's template name
+				local variant_plugin_dir="$NIGHTFALL_DIR/plugins/$variant_plugin"
+				local variant_matugen_config="$variant_plugin_dir/.config/matugen/config.toml"
+				if [[ -f "$variant_matugen_config" ]]; then
+					local variant_template
+					variant_template=$(grep -m1 '^\[templates\.' "$variant_matugen_config" 2>/dev/null | sed 's/^\[templates\.//; s/\]$//')
+					if [[ -n "$variant_template" ]]; then
+						# Directly turn off variant by commenting it out in config
+						local temp_config_off
+						temp_config_off=$(mktemp)
+						if awk -v template="[templates.$variant_template]" '
+							$0 == template {
+								print "#" $0
+								in_block=1
+								next
+							}
+							in_block && /^\[.*\]/ {
+								in_block=0
+								print
+								next
+							}
+							in_block {
+								print "#" $0
+								next
+							}
+							{ print }
+						' "$matugen_config" >"$temp_config_off"; then
+							if mv "$temp_config_off" "$matugen_config"; then
+								temp_config_off=""
+							else
+								rm -f "$temp_config_off"
+							fi
+						fi
 					fi
 				fi
 			fi
@@ -1006,29 +1000,31 @@ draw_ui() {
 		IFS='|' read -r title description installed <<<"$plugin_info"
 
 		if ((CURRENT_TAB == 0)); then
-			# Plugins tab - show status with conflict detection
+			# Plugins tab - show status with variant detection
 			if [[ "$installed" == "true" ]]; then
 				display="${C_GREEN}Installed${C_RESET}"
 			else
-				# Check for conflicts with spice plugins - show Available regardless of variant status
-				if [[ "$item" == "spicetext" ]] || [[ "$item" == "spicedim" ]]; then
-					display="${C_GREY}Available${C_RESET}"
-				# Check for conflicts with fox plugins
-				elif [[ "$item" == "textfox" ]]; then
-					local dimfox_info="${PLUGIN_INFO[dimfox]}"
-					local dimfox_installed
-					dimfox_installed=$(echo "$dimfox_info" | cut -d'|' -f3)
-					if [[ "$dimfox_installed" == "true" ]]; then
-						display="${C_GREY}Available${C_RESET}"
-					else
-						display="${C_GREY}Available${C_RESET}"
-					fi
-				elif [[ "$item" == "dimfox" ]]; then
-					local textfox_info="${PLUGIN_INFO[textfox]}"
-					local textfox_installed
-					textfox_installed=$(echo "$textfox_info" | cut -d'|' -f3)
-					if [[ "$textfox_installed" == "true" ]]; then
-						display="${C_GREY}Available${C_RESET}"
+				# Check if this plugin has a variant that might affect availability
+				local variant_plugin="${PLUGIN_VARIANTS[$item]:-}"
+				if [[ -n "$variant_plugin" ]]; then
+					local variant_info="${PLUGIN_INFO[$variant_plugin]:-}"
+					local variant_installed
+					variant_installed=$(echo "$variant_info" | cut -d'|' -f3)
+					if [[ "$variant_installed" == "true" ]]; then
+						# Check if variant supports toggling (has matugen config)
+						local variant_dir="$NIGHTFALL_DIR/plugins/$variant_plugin"
+						local variant_matugen_config="$variant_dir/.config/matugen/config.toml"
+						if [[ -f "$variant_matugen_config" ]]; then
+							local variant_status
+							variant_status=$(get_plugin_toggle_status "$variant_plugin" 2>/dev/null || echo "OFF")
+							if [[ "$variant_status" == "ON" ]]; then
+								display="${C_YELLOW}Available (Variant ON)${C_RESET}"
+							else
+								display="${C_GREY}Available${C_RESET}"
+							fi
+						else
+							display="${C_GREY}Available${C_RESET}"
+						fi
 					else
 						display="${C_GREY}Available${C_RESET}"
 					fi
