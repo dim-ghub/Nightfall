@@ -379,6 +379,12 @@ install_plugin() {
 	# Update cache instead of refreshing all plugins
 	add_plugin_to_cache "$plugin_name"
 
+	# Update PLUGIN_INFO and TAB_ITEMS_1 to reflect installation
+	if [[ "$installed" != "true" ]]; then
+		PLUGIN_INFO["$plugin_name"]=$(echo "${PLUGIN_INFO[$plugin_name]}" | sed 's/|false$/|true/')
+		TAB_ITEMS_1+=("$plugin_name")
+	fi
+
 	# Execute theme refresh after installation
 	if [[ -f "$HOME/user_scripts/theme_matugen/theme_ctl.sh" ]]; then
 		printf '%bRefreshing theme...%b\n' "$C_BLUE" "$C_RESET"
