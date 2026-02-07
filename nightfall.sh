@@ -509,7 +509,11 @@ toggle_plugin() {
 					}
 					{ print }
 				' "$matugen_config" >"$temp_config_off"; then
-					mv "$temp_config_off" "$matugen_config"
+					if mv "$temp_config_off" "$matugen_config"; then
+						temp_config_off=""
+					else
+						rm -f "$temp_config_off"
+					fi
 				fi
 			fi
 		elif [[ "$plugin_name" == "spicedim" ]]; then
@@ -537,7 +541,11 @@ toggle_plugin() {
 					}
 					{ print }
 				' "$matugen_config" >"$temp_config_off"; then
-					mv "$temp_config_off" "$matugen_config"
+					if mv "$temp_config_off" "$matugen_config"; then
+						temp_config_off=""
+					else
+						rm -f "$temp_config_off"
+					fi
 				fi
 			fi
 		fi
