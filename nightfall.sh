@@ -1263,15 +1263,19 @@ main() {
 			'[C' | 'OC')                # Arrow Right - toggle plugin
 				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
 					toggle_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
+					get_available_plugins
 				elif ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
 					toggle_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
+					get_available_plugins
 				fi
 				;;
 			'[D' | 'OD') # Arrow Left - toggle plugin
 				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
 					toggle_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
+					get_available_plugins
 				elif ((CURRENT_TAB == 1)) && ((SELECTED_ROW < ${#TAB_ITEMS_1[@]})); then
 					toggle_plugin "${TAB_ITEMS_1[SELECTED_ROW]}"
+					get_available_plugins
 				fi
 				;;
 			'[<'* | '['*'<'*) handle_mouse "$seq" ;;
