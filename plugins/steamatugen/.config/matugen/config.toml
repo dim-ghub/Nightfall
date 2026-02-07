@@ -1,9 +1,9 @@
-[templates.steam]
-input_path  = '~/.config/matugen/templates/steam.json'
-output_path = '~/.config/matugen/generated/steam.json'
+[templates.steamatugen]
+input_path  = '~/.config/matugen/templates/steamatugen.json'
+output_path = '~/.config/matugen/generated/steamatugen.json'
 post_hook   = '''
 if [[ -d "$HOME/homebrew/themes/Color Master" ]]; then
-    ln -nfs $HOME/.config/matugen/generated/steam.json $HOME/homebrew/themes/Color\ Master/config_USER.json;
+    ln -nfs $HOME/.config/matugen/generated/steamatugen.json $HOME/homebrew/themes/Color\ Master/config_USER.json;
     sudo systemctl restart plugin_loader;
 fi
 '''

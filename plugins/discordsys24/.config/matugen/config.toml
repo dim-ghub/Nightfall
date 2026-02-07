@@ -1,6 +1,6 @@
-[templates.discord]
-input_path  = '~/.config/matugen/templates/discord.css'
-output_path = '~/.config/matugen/generated/discord.css'
+[templates.discordsys24]
+input_path  = '~/.config/matugen/templates/discordsys24.css'
+output_path = '~/.config/matugen/generated/discordsys24.css'
 post_hook   = '''
 TARGETS=(
   "$HOME/.config/vesktop/settings/quickCss.css"
@@ -13,7 +13,7 @@ TARGETS=(
 
 for target in "${TARGETS[@]}"; do
   if [ -d "$(dirname "$target")" ]; then
-    ln -nfs "$HOME/.config/matugen/generated/discord.css" "$target"
+    ln -nfs "$HOME/.config/matugen/generated/discordsys24.css" "$target"
   fi
 done
 '''

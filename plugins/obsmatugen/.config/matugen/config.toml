@@ -1,3 +1,3 @@
-[templates.obs-studio]
-input_path  = '~/.config/matugen/templates/obs-studio.ovt'
+[templates.obsmatugen]
+input_path  = '~/.config/matugen/templates/obsmatugen.ovt'
 output_path = '~/.config/obs-studio/themes/matugen.ovt'

@@ -1,3 +1,3 @@
-[templates.fastfetch]
-input_path = '~/.config/matugen/templates/fastfetch'
-output_path = '~/.config/matugen/generated/fastfetch'
+[templates.matugenfetch]
+input_path = '~/.config/matugen/templates/matugenfetch'
+output_path = '~/.config/matugen/generated/matugenfetch'

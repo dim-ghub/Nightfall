@@ -1,9 +1,9 @@
-[templates.spicetify]
-input_path  = '~/.config/matugen/templates/spotify-colors.ini'
-output_path = '~/.config/matugen/generated/spotify-colors.ini'
+[templates.spicedim]
+input_path  = '~/.config/matugen/templates/spicedim.ini'
+output_path = '~/.config/matugen/generated/spicedim.ini'
 post_hook   = '''
 if command -v spicetify &> /dev/null && [ -d "$HOME/.config/spicetify/Themes/dim" ]; then
-    ln -nfs $HOME/.config/matugen/generated/spotify-colors.ini $HOME/.config/spicetify/Themes/dim/color.ini;
+    ln -nfs $HOME/.config/matugen/generated/spicedim.ini $HOME/.config/spicetify/Themes/dim/color.ini;
     spicetify apply -n;
     hyprctl dispatch sendshortcut "CTRL SHIFT, R, class:^(spotify)$" || true;
 fi
