@@ -488,8 +488,7 @@ toggle_plugin() {
 			local spicedim_status
 			spicedim_status=$(get_plugin_toggle_status "spicedim" 2>/dev/null || echo "OFF")
 			if [[ "$spicedim_status" == "ON" ]]; then
-				# Directly turn off spicedim without recursion
-				local spicedim_dir="$NIGHTFALL_DIR/plugins/spicedim"
+				# Directly turn off spicedim by commenting it out in config
 				local spicedim_template="spicedim"
 				local temp_config_off
 				temp_config_off=$(mktemp)
@@ -512,17 +511,12 @@ toggle_plugin() {
 				' "$matugen_config" >"$temp_config_off"; then
 					mv "$temp_config_off" "$matugen_config"
 				fi
-				# Run spicedim setup script --off
-				if [[ -f "$spicedim_dir/setup.sh" ]]; then
-					bash "$spicedim_dir/setup.sh" --off 2>/dev/null || true
-				fi
 			fi
 		elif [[ "$plugin_name" == "spicedim" ]]; then
 			local spicetext_status
 			spicetext_status=$(get_plugin_toggle_status "spicetext" 2>/dev/null || echo "OFF")
 			if [[ "$spicetext_status" == "ON" ]]; then
-				# Directly turn off spicetext without recursion
-				local spicetext_dir="$NIGHTFALL_DIR/plugins/spicetext"
+				# Directly turn off spicetext by commenting it out in config
 				local spicetext_template="spicetext"
 				local temp_config_off
 				temp_config_off=$(mktemp)
@@ -544,10 +538,6 @@ toggle_plugin() {
 					{ print }
 				' "$matugen_config" >"$temp_config_off"; then
 					mv "$temp_config_off" "$matugen_config"
-				fi
-				# Run spicetext setup script --off
-				if [[ -f "$spicetext_dir/setup.sh" ]]; then
-					bash "$spicetext_dir/setup.sh" --off 2>/dev/null || true
 				fi
 			fi
 		fi
