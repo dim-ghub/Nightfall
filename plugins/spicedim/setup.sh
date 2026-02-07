@@ -7,6 +7,7 @@
 # =============================================================================
 
 set -euo pipefail
+shopt -s inherit_errexit
 
 # Handle command line arguments
 ACTION=""

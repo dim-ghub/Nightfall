@@ -357,15 +357,8 @@ handle_on() {
 handle_off() {
 	log_info "Disabling Steam Matugen theme..."
 
-	# Stop plugin_loader service only
+	# Stop plugin_loader service
 	stop_plugin_loader
-
-	log_success "Steam Matugen theme disabled!"
-	log_info "plugin_loader service is stopped. Other themes remain available in CSS Loader"
-}
-
-handle_off() {
-	log_info "Disabling Steam Matugen theme..."
 
 	# Remove the Matugen theme symlink
 	local css_loader_theme_dir="$HOME/homebrew/themes/Matugen"
@@ -375,7 +368,7 @@ handle_off() {
 	fi
 
 	log_success "Steam Matugen theme disabled!"
-	log_info "Other themes remain available in CSS Loader"
+	log_info "plugin_loader service is stopped. Other themes remain available in CSS Loader"
 }
 
 # --- Execution ---

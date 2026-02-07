@@ -8,6 +8,7 @@
 # =============================================================================
 
 set -euo pipefail
+shopt -s inherit_errexit
 
 # Handle command line arguments
 ACTION=""
@@ -40,7 +41,6 @@ log_warning() { printf "${YELLOW}[WARNING]${NC} %s\n" "$1"; }
 log_error() { printf "${RED}[ERROR]${NC} %s\n" "$1"; }
 
 # Script paths
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly FASTFETCH_DIR="$HOME/.config/fastfetch"
 readonly FASTFETCH_SCRIPTS_DIR="$HOME/.config/fastfetch/scripts"
 readonly ZSHRC="$HOME/.zshrc"
@@ -64,7 +64,7 @@ check_scripts() {
 check_dependencies() {
 	log_info "Checking dependencies..."
 
-	local deps=("fastfetch" "python3" "pil" "numpy")
+	local deps=("fastfetch" "python3")
 	local missing=()
 
 	# Check fastfetch
@@ -77,9 +77,9 @@ check_dependencies() {
 		missing+=("python3")
 	fi
 
-	# Check Python modules
+	# Check Python modules (PIL and numpy)
 	if ! python3 -c "import PIL, numpy" &>/dev/null; then
-		missing+=("python3-pil python3-numpy")
+		missing+=("python-pillow python-numpy")
 	fi
 
 	if [[ ${#missing[@]} -gt 0 ]]; then

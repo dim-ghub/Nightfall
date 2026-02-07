@@ -307,22 +307,22 @@ get_plugin_details() {
 	local plugin_name="$1"
 	local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin_name"
 
-	echo "Plugin: ${C_WHITE}$plugin_name${C_RESET}"
-	echo "Directory: ${C_GREY}$plugin_dir${C_RESET}"
-	echo ""
+	printf 'Plugin: %b%s%b\n' "$C_WHITE" "$plugin_name" "$C_RESET"
+	printf 'Directory: %b%s%b\n' "$C_GREY" "$plugin_dir" "$C_RESET"
+	printf '\n'
 
 	# Show info file content
 	local info_file="$plugin_dir/info"
 	if [[ -f "$info_file" ]]; then
-		echo "${C_CYAN}Plugin Information:${C_RESET}"
+		printf '%bPlugin Information:%b\n' "$C_CYAN" "$C_RESET"
 		cat "$info_file"
-		echo ""
+		printf '\n'
 	fi
 
 	# Show config structure
 	local config_dir="$plugin_dir/.config"
 	if [[ -d "$config_dir" ]]; then
-		echo "${C_CYAN}Configuration Files:${C_RESET}"
+		printf '%bConfiguration Files:%b\n' "$C_CYAN" "$C_RESET"
 		find "$config_dir" -type f -o -type d | grep -v previews | sed 's|.*/|  |'
 	fi
 }
@@ -341,27 +341,27 @@ install_plugin() {
 
 	# Show plugin details
 	clear
-	echo -e "${C_CYAN}${C_INVERSE} $action Plugin: $plugin_name ${C_RESET}"
-	echo ""
+	printf '%b %s Plugin: %s %b\n' "$C_CYAN" "$C_INVERSE" "$plugin_name" "$C_RESET"
+	printf '\n'
 	get_plugin_details "$plugin_name"
-	echo ""
+	printf '\n'
 
 	if [[ "$installed" == "true" ]]; then
-		echo -e "${C_YELLOW}Plugin is already installed. Press [Enter] to reinstall/update or [q] to cancel...${C_RESET}"
+		printf '%bPlugin is already installed. Press [Enter] to reinstall/update or [q] to cancel...%b\n' "$C_YELLOW" "$C_RESET"
 	else
-		echo -e "${C_YELLOW}Press [Enter] to continue installation or [q] to cancel...${C_RESET}"
+		printf '%bPress [Enter] to continue installation or [q] to cancel...%b\n' "$C_YELLOW" "$C_RESET"
 	fi
 	read -rsn1 key
 	[[ "$key" == "q" || "$key" == "Q" ]] && return 0
 
 	# Check if plugin directory exists
 	if [[ ! -d "$plugin_dir" ]]; then
-		echo -e "${C_RED}Error: Plugin directory not found: $plugin_dir${C_RESET}"
+		printf '%bError: Plugin directory not found: %s%b\n' "$C_RED" "$plugin_dir" "$C_RESET"
 		read -p "Press Enter to continue..." -r
 		return 1
 	fi
 
-	echo -e "${C_BLUE}Installing configuration files...${C_RESET}"
+	printf '%bInstalling configuration files...%b\n' "$C_BLUE" "$C_RESET"
 
 	# Install .config contents
 	local config_dir="$plugin_dir/.config"
@@ -374,15 +374,15 @@ install_plugin() {
 				handle_matugen_config "$item"
 			elif [[ "$item_name" == "previews" ]]; then
 				# Skip previews folders
-				echo -e "  ${C_GREY}⚠${C_RESET} Skipping previews folder"
+				printf '  %b⚠%b Skipping previews folder\n' "$C_GREY" "$C_RESET"
 				continue
 			else
 				# Copy other folders directly
 				if [[ -d "$item" ]]; then
-					echo -e "  ${C_GREEN}✓${C_RESET} Copying $item_name to ~/.config/"
+					printf '  %b✓%b Copying %s to ~/.config/\n' "$C_GREEN" "$C_RESET" "$item_name"
 					cp -r "$item" "$HOME_CONFIG/"
 				elif [[ -f "$item" ]]; then
-					echo -e "  ${C_GREEN}✓${C_RESET} Copying file $item_name to ~/.config/"
+					printf '  %b✓%b Copying file %s to ~/.config/\n' "$C_GREEN" "$C_RESET" "$item_name"
 					cp "$item" "$HOME_CONFIG/"
 				fi
 			fi
@@ -392,20 +392,20 @@ install_plugin() {
 	# Run setup script if it exists
 	local setup_script="$plugin_dir/setup.sh"
 	if [[ -f "$setup_script" ]]; then
-		echo -e "${C_BLUE}Running setup script...${C_RESET}"
+		printf '%bRunning setup script...%b\n' "$C_BLUE" "$C_RESET"
 		if bash -i "$setup_script"; then
-			echo -e "  ${C_GREEN}✓${C_RESET} Setup script completed successfully"
+			printf '  %b✓%b Setup script completed successfully\n' "$C_GREEN" "$C_RESET"
 		else
-			echo -e "  ${C_RED}✗${C_RESET} Setup script failed"
+			printf '  %b✗%b Setup script failed\n' "$C_RED" "$C_RESET"
 			read -p "Press Enter to continue..." -r
 			return 1
 		fi
 	fi
 
 	if [[ "$installed" == "true" ]]; then
-		echo -e "${C_GREEN}Plugin $plugin_name reinstalled/updated successfully!${C_RESET}"
+		printf '%bPlugin %s reinstalled/updated successfully!%b\n' "$C_GREEN" "$plugin_name" "$C_RESET"
 	else
-		echo -e "${C_GREEN}Plugin $plugin_name installed successfully!${C_RESET}"
+		printf '%bPlugin %s installed successfully!%b\n' "$C_GREEN" "$plugin_name" "$C_RESET"
 	fi
 
 	# Update cache instead of refreshing all plugins
@@ -413,7 +413,7 @@ install_plugin() {
 
 	# Execute theme refresh after installation
 	if [[ -f "$HOME/user_scripts/theme_matugen/theme_ctl.sh" ]]; then
-		echo -e "${C_BLUE}Refreshing theme...${C_RESET}"
+		printf '%bRefreshing theme...%b\n' "$C_BLUE" "$C_RESET"
 		bash "$HOME/user_scripts/theme_matugen/theme_ctl.sh" refresh
 	fi
 
@@ -466,7 +466,13 @@ toggle_plugin() {
 
 	if [[ "$is_enabled" == "true" ]]; then
 		# Turn off: comment out the block
-		awk -v template="[templates.$template_name]" '
+		local temp_config
+		temp_config=$(mktemp) || {
+			log_err "Failed to create temp file"
+			return 1
+		}
+
+		if awk -v template="[templates.$template_name]" '
 			$0 == template { 
 				print "#" $0
 				in_block=1
@@ -482,7 +488,20 @@ toggle_plugin() {
 				next 
 			}
 			{ print }
-		' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+		' "$matugen_config" >"$temp_config"; then
+			if mv "$temp_config" "$matugen_config"; then
+				# Success - remove temp file tracking
+				temp_config=""
+			else
+				rm -f "$temp_config"
+				log_err "Failed to update matugen config"
+				return 1
+			fi
+		else
+			rm -f "$temp_config"
+			log_err "Failed to process matugen config"
+			return 1
+		fi
 
 		# Run setup script with --off flag if available
 		local setup_script="$plugin_dir/setup.sh"
@@ -491,7 +510,13 @@ toggle_plugin() {
 		fi
 	else
 		# Turn on: uncomment the block
-		awk -v template="[templates.$template_name]" '
+		local temp_config
+		temp_config=$(mktemp) || {
+			log_err "Failed to create temp file"
+			return 1
+		}
+
+		if awk -v template="[templates.$template_name]" '
 			/^#/ && $0 == "#" template { 
 				print substr($0, 2)
 				in_block=1
@@ -507,7 +532,20 @@ toggle_plugin() {
 				next
 			}
 			{ print }
-		' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+		' "$matugen_config" >"$temp_config"; then
+			if mv "$temp_config" "$matugen_config"; then
+				# Success - remove temp file tracking
+				temp_config=""
+			else
+				rm -f "$temp_config"
+				log_err "Failed to update matugen config"
+				return 1
+			fi
+		else
+			rm -f "$temp_config"
+			log_err "Failed to process matugen config"
+			return 1
+		fi
 
 		# Run setup script with --on flag if available
 		local setup_script="$plugin_dir/setup.sh"
@@ -539,7 +577,13 @@ uninstall_plugin() {
 
 		if [[ -n "$template_name" ]]; then
 			# Remove the entire block from matugen config
-			awk -v template="[templates.$template_name]" '
+			local temp_config
+			temp_config=$(mktemp) || {
+				log_err "Failed to create temp file"
+				return 1
+			}
+
+			if awk -v template="[templates.$template_name]" '
 				$0 == template { 
 					in_block=1
 					skip_block=1
@@ -551,7 +595,18 @@ uninstall_plugin() {
 				}
 				skip_block { next }
 				{ print }
-			' "$matugen_config" >"$matugen_config.tmp" && mv "$matugen_config.tmp" "$matugen_config"
+			' "$matugen_config" >"$temp_config"; then
+				if mv "$temp_config" "$matugen_config"; then
+					# Success
+					temp_config=""
+				else
+					rm -f "$temp_config"
+					log_err "Failed to update matugen config during uninstall"
+				fi
+			else
+				rm -f "$temp_config"
+				log_err "Failed to process matugen config during uninstall"
+			fi
 		fi
 	fi
 
@@ -620,7 +675,7 @@ handle_matugen_config() {
 	local target_config="$HOME_CONFIG/matugen/config.toml"
 
 	if [[ -f "$config_file" ]]; then
-		echo -e "  ${C_GREEN}✓${C_RESET} Merging matugen config.toml"
+		printf '  %b✓%b Merging matugen config.toml\n' "$C_GREEN" "$C_RESET"
 		mkdir -p "$(dirname "$target_config")"
 		smart_merge_matugen_config "$config_file" "$target_config"
 	fi
@@ -628,7 +683,7 @@ handle_matugen_config() {
 	# Handle templates folder (copy if exists)
 	local templates_dir="$matugen_dir/templates"
 	if [[ -d "$templates_dir" ]]; then
-		echo -e "  ${C_GREEN}✓${C_RESET} Copying matugen templates"
+		printf '  %b✓%b Copying matugen templates\n' "$C_GREEN" "$C_RESET"
 		mkdir -p "$HOME_CONFIG/matugen/templates"
 		cp -r "$templates_dir"/* "$HOME_CONFIG/matugen/templates/"
 	fi
@@ -637,18 +692,33 @@ handle_matugen_config() {
 smart_merge_matugen_config() {
 	local plugin_config="$1"
 	local target_config="$2"
+	local temp_config=""
+
+	# Cleanup function for temp file - use RETURN to not override main EXIT trap
+	_merge_cleanup() {
+		if [[ -n "${temp_config:-}" && -f "$temp_config" ]]; then
+			rm -f "$temp_config"
+		fi
+	}
+	trap _merge_cleanup RETURN
 
 	# Read the plugin config content
 	local plugin_content
-	plugin_content=$(cat "$plugin_config")
+	if ! plugin_content=$(cat "$plugin_config" 2>/dev/null); then
+		log_err "Failed to read plugin config: $plugin_config"
+		return 1
+	fi
 
 	# Extract the section title (first line that starts with [)
 	local plugin_title
-	plugin_title=$(echo "$plugin_content" | grep '^\[' | head -n1)
+	plugin_title=$(printf '%s' "$plugin_content" | grep '^\[' | head -n1)
 
 	# If no title found, just append normally
 	if [[ -z "$plugin_title" ]]; then
-		echo "$plugin_content" >>"$target_config"
+		printf '%s\n' "$plugin_content" >>"$target_config" || {
+			log_err "Failed to append to target config"
+			return 1
+		}
 		return 0
 	fi
 
@@ -662,29 +732,36 @@ smart_merge_matugen_config() {
 				$0 == section { found=1; print; next }
 				found && /^\[/ { exit }
 				found { print }
-			' "$target_config")
+			' "$target_config" 2>/dev/null || true)
 
 		# Normalize both for comparison (remove leading/trailing whitespace)
 		local plugin_clean existing_clean
-		plugin_clean=$(echo "$plugin_content" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
-		existing_clean=$(echo "$existing_section" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' || true)
+		plugin_clean=$(printf '%s' "$plugin_content" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' || true)
+		existing_clean=$(printf '%s' "$existing_section" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' || true)
 
 		if [[ "$plugin_clean" == "$existing_clean" ]]; then
-			echo -e "    ${C_GREY}✓${C_RESET} Config already exists, skipping"
+			printf '    %b✓%b Config already exists, skipping\n' "$C_GREY" "$C_RESET"
 			return 0
 		fi
 
 		# If section doesn't exist at all, just append it
 		if [[ -z "$existing_clean" ]]; then
-			echo "" >>"$target_config"
-			echo "$plugin_content" >>"$target_config"
-			echo -e "    ${C_GREY}✓${C_RESET} Added new config section"
+			{
+				printf '\n'
+				printf '%s\n' "$plugin_content"
+			} >>"$target_config" || {
+				log_err "Failed to append to target config"
+				return 1
+			}
+			printf '    %b✓%b Added new config section\n' "$C_GREY" "$C_RESET"
 			return 0
 		fi
 
 		# Create temp file for the new config
-		local temp_config
-		temp_config=$(mktemp)
+		temp_config=$(mktemp) || {
+			log_err "Failed to create temp file"
+			return 1
+		}
 
 		# Read target config line by line
 		local in_section=false
@@ -697,7 +774,10 @@ smart_merge_matugen_config() {
 				in_section=true
 				found_section=true
 				# Comment out this line
-				echo "# $line" >>"$temp_config"
+				printf '# %s\n' "$line" >>"$temp_config" || {
+					log_err "Failed to write to temp config"
+					return 1
+				}
 				continue
 			fi
 
@@ -708,16 +788,28 @@ smart_merge_matugen_config() {
 					in_section=false
 					# Comment out the empty line before if it was empty
 					if [[ "$line_before_empty" == "true" ]]; then
-						echo "# " >>"$temp_config"
+						printf '# \n' >>"$temp_config" || {
+							log_err "Failed to write to temp config"
+							return 1
+						}
 					fi
-					echo "$line" >>"$temp_config"
+					printf '%s\n' "$line" >>"$temp_config" || {
+						log_err "Failed to write to temp config"
+						return 1
+					}
 				else
 					# Comment out the line in the section
-					echo "# $line" >>"$temp_config"
+					printf '# %s\n' "$line" >>"$temp_config" || {
+						log_err "Failed to write to temp config"
+						return 1
+					}
 				fi
 			else
 				# Not in the section, copy as-is
-				echo "$line" >>"$temp_config"
+				printf '%s\n' "$line" >>"$temp_config" || {
+					log_err "Failed to write to temp config"
+					return 1
+				}
 			fi
 
 			# Track if the previous line was empty
@@ -729,21 +821,35 @@ smart_merge_matugen_config() {
 		done <"$target_config"
 
 		# Add the new plugin config at the end
-		echo "" >>"$temp_config"
-		echo "$plugin_content" >>"$temp_config"
+		{
+			printf '\n'
+			printf '%s\n' "$plugin_content"
+		} >>"$temp_config" || {
+			log_err "Failed to append to temp config"
+			return 1
+		}
 
-		# Replace the target config
-		mv "$temp_config" "$target_config"
+		# Replace the target config atomically
+		if ! mv "$temp_config" "$target_config"; then
+			log_err "Failed to replace target config"
+			return 1
+		fi
+
+		# Temp file moved successfully, clear cleanup trap
+		temp_config=""
 
 		if [[ "$found_section" == "true" ]]; then
-			echo -e "    ${C_YELLOW}✓${C_RESET} Commented out existing section and added new config"
+			printf '    %b✓%b Commented out existing section and added new config\n' "$C_YELLOW" "$C_RESET"
 		else
-			echo -e "    ${C_GREY}✓${C_RESET} Added new config section"
+			printf '    %b✓%b Added new config section\n' "$C_GREY" "$C_RESET"
 		fi
 	else
 		# Target doesn't exist, just copy the plugin config
-		echo "$plugin_content" >"$target_config"
-		echo -e "    ${C_GREY}✓${C_RESET} Created new config file"
+		if ! printf '%s\n' "$plugin_content" >"$target_config"; then
+			log_err "Failed to create target config"
+			return 1
+		fi
+		printf '    %b✓%b Created new config file\n' "$C_GREY" "$C_RESET"
 	fi
 }
 
@@ -756,11 +862,11 @@ show_plugin_info() {
 	fi
 
 	clear
-	echo -e "${C_CYAN}${C_INVERSE} Plugin Information ${C_RESET}"
-	echo ""
+	printf '%b %s %b\n' "$C_CYAN" "$C_INVERSE" " Plugin Information " "$C_RESET"
+	printf '\n'
 	get_plugin_details "$plugin_name"
-	echo ""
-	echo -e "${C_YELLOW}Press Enter to continue...${C_RESET}"
+	printf '\n'
+	printf '%bPress Enter to continue...%b\n' "$C_YELLOW" "$C_RESET"
 	read -r
 }
 
@@ -1110,9 +1216,6 @@ main() {
 		# Safety: break on EOF to prevent 100% CPU loops
 		IFS= read -rsn1 key || break
 
-		# Debug: Show every key press
-		printf "DEBUG: Key read: %q (ASCII: %d)\n" "$key" "'$key" >>/tmp/nightfall_debug.log
-
 		# Handle Enter key that might be read as empty string (common with read -rsn1)
 		if [[ -z "$key" ]]; then
 			key=$'\n'
@@ -1161,8 +1264,6 @@ main() {
 				fi
 				;;
 			$'\n' | $'\r') # Enter key (handle LF and CR)
-				# Debug: Show we detected Enter key
-				echo "DEBUG: Enter key detected, tab=$CURRENT_TAB, row=$SELECTED_ROW" >>/tmp/nightfall_debug.log
 				if ((CURRENT_TAB == 0)) && ((SELECTED_ROW < ${#TAB_ITEMS_0[@]})); then
 					install_plugin "${TAB_ITEMS_0[SELECTED_ROW]}"
 					get_available_plugins
@@ -1172,10 +1273,6 @@ main() {
 				fi
 				;;
 			q | Q | $'\x03') break ;;
-			*)
-				# Debug: Show unknown keys
-				printf "DEBUG: Unknown key: %q (ASCII: %d)\n" "$key" "'$key" >>/tmp/nightfall_debug.log
-				;;
 			esac
 		fi
 	done

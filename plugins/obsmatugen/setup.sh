@@ -7,6 +7,7 @@
 # =============================================================================
 
 set -euo pipefail
+shopt -s inherit_errexit
 
 # Handle command line arguments
 ACTION=""
@@ -89,7 +90,7 @@ edit_obs_config() {
 
 		# Check if [Appearance] section exists
 		if ! grep -q "^\[Appearance\]" "$obs_config"; then
-			echo -e "\n[Appearance]" >>"$obs_config"
+			printf '\n[Appearance]\n' >>"$obs_config"
 		fi
 
 		# Add or update Theme setting

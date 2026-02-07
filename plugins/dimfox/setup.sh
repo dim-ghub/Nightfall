@@ -7,6 +7,7 @@
 # =============================================================================
 
 set -euo pipefail
+shopt -s inherit_errexit
 
 # Handle command line arguments
 ACTION=""
@@ -73,7 +74,7 @@ handle_on() {
 	if [[ -d "$TEXTFOX_DIR" ]]; then
 		cd "$TEXTFOX_DIR"
 		if [[ -f "tf-install.sh" ]]; then
-			sh tf-install.sh
+			bash tf-install.sh
 			log_success "TextFox theme enabled!"
 		else
 			log_error "tf-install.sh not found"
@@ -102,7 +103,7 @@ handle_install() {
 	fi
 
 	# Clone the textfox-rounded repository
-	git clone https://github.com/dim-ghub/textfox-rounded.git ~/textfox-rounded
+	git clone https://github.com/dim-ghub/textfox-rounded.git "$TEXTFOX_DIR"
 
 	# Change into the cloned directory
 	cd "$TEXTFOX_DIR"
