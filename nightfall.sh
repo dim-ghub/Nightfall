@@ -234,71 +234,12 @@ get_available_plugins() {
 		fi
 	done
 
-	# Check installed status using cache first
+	# Check installed status using cache only
 	for plugin in "${AVAILABLE_PLUGINS[@]}"; do
-		local plugin_dir="$NIGHTFALL_DIR/plugins/$plugin"
-		local config_dir="$plugin_dir/.config"
-
-		if [[ -d "$config_dir" ]]; then
-			local is_installed=false
-
-			# Check cache first
-			if is_plugin_cached_installed "$plugin"; then
-				is_installed=true
-			else
-				# Fallback to filesystem check if cache miss
-				local filesystem_check=true
-				for item in "$config_dir"/*; do
-					local item_name
-					item_name=$(basename "$item")
-					if [[ "$item_name" == "matugen" && -d "$item" ]]; then
-						# Check matugen config.toml content
-						local plugin_config="$item/config.toml"
-						local user_config="$HOME_CONFIG/matugen/config.toml"
-						if [[ -f "$plugin_config" && -f "$user_config" ]]; then
-							if ! grep -qF "$(cat "$plugin_config")" "$user_config"; then
-								filesystem_check=false
-								break
-							fi
-						else
-							filesystem_check=false
-							break
-						fi
-					elif [[ -d "$item" ]]; then
-						local target_dir="$HOME_CONFIG/$item_name"
-						if [[ ! -d "$target_dir" ]]; then
-							filesystem_check=false
-							break
-						fi
-					elif [[ -f "$item" ]]; then
-						local target_file="$HOME_CONFIG/$item_name"
-						if [[ ! -f "$target_file" ]]; then
-							filesystem_check=false
-							break
-						fi
-					fi
-				done
-
-				# Cache takes precedence - if cache says installed, trust it
-				if is_plugin_cached_installed "$plugin"; then
-					is_installed=true
-				elif [[ "$filesystem_check" == "true" ]]; then
-					is_installed=true
-					# Update cache with filesystem verification result
-					add_plugin_to_cache "$plugin"
-				fi
-			fi
-
-			if [[ "$is_installed" == "true" ]]; then
-				PLUGIN_INFO["$plugin"]=$(echo "${PLUGIN_INFO[$plugin]}" | sed 's/|false$/|true/')
-				TAB_ITEMS_1+=("$plugin")
-			fi
-		else
-			# Cache takes precedence over filesystem checks
-			if is_plugin_cached_installed "$plugin"; then
-				PLUGIN_INFO["$plugin"]=$(echo "${PLUGIN_INFO[$plugin]}" | sed 's/|false$/|true/')
-				TAB_ITEMS_1+=("$plugin")
-			fi
+		# Only use cache to determine installation status
+		if is_plugin_cached_installed "$plugin"; then
+			PLUGIN_INFO["$plugin"]=$(echo "${PLUGIN_INFO[$plugin]}" | sed 's/|false$/|true/')
+			TAB_ITEMS_1+=("$plugin")
 		fi
 	done
 }
