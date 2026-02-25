@@ -20,7 +20,7 @@ readonly XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
 readonly INPUT_DIR="$XDG_CONFIG_HOME/fastfetch/pngs"
 readonly OUTPUT_DIR="$INPUT_DIR/generated"
-readonly COLOR_FILE="$XDG_CONFIG_HOME/matugen/generated/fastfetch"
+readonly COLOR_FILE="$XDG_CONFIG_HOME/matugen/generated/matugenfetch"
 readonly CACHE_DIR="$XDG_CACHE_HOME/fastfetch/images"
 
 # Base palette (immutable reference colors)
